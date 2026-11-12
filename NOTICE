@@ -9,10 +9,11 @@ License: MIT (see LICENSE)
 
 The upstream project has not endorsed this fork.
 
-This delivery changes repository gates only. Capture corrections are not in
-this tree. Maintained packages are packages/fluvie and
-packages/fluvie_mobile_encoder. Other workspace packages stay as upstream
-published them at v0.3.1.
+Maintained packages are packages/fluvie and packages/fluvie_mobile_encoder
+at 0.3.1+socialstudio.1. This fork is not published. The capture corrections
+are in this tree: render and renderToSandbox prepare captions, and the
+offscreen host resolves motion without an application frame. Other workspace
+packages stay as upstream published them at v0.3.1.
 
 What changed, recorded 2026-11-12:
 
@@ -23,6 +24,9 @@ What changed, recorded 2026-11-12:
 - A lockfile refresh required by that same Flutter pin.
 - Publish, image, docs, and website workflows blocked so this fork cannot
   publish or deploy as upstream.
+- Capture corrections in the maintained packages: caption preparation in
+  render and renderToSandbox, and offscreen host disposal. The limits are
+  in docs/fork-maintenance.md.
 - The upstream test and coverage jobs are absent from
   .github/workflows/ci.yaml. The reason and the Actions run id are in
   docs/fork-maintenance.md. The historical failures are not claimed fixed.

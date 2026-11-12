@@ -110,6 +110,39 @@ Other upstream jobs that succeeded on that run stay in `ci.yaml` on Flutter
 ffmpeg integration, and `melos run gate` (including the 97% coverage gate)
 were not re-run locally.
 
+## Capture corrections
+
+Recorded 2026-11-12, on top of the repository gates. The maintained
+packages are `0.3.1+socialstudio.1`. The build metadata keeps a dependency
+written as `fluvie: ^0.3.1` valid. Nothing in this delivery was published
+to pub.dev.
+
+`render` and `renderToSandbox` pre-resolve inline, SRT, and VTT captions
+in the existing media pass. Callers do not have to call
+`preResolveCaptions` first. `OffscreenCaptureHost` drains composition
+preparation without an application frame, rejects `mount` and `pumpFrame`
+during an application build, and returns one dispose future. Dispose
+started from `State.dispose` waits for that frame's post-frame callbacks,
+then releases the `RenderView` and the `PipelineOwner`. A preparation that
+keeps scheduling itself stops after 8 passes with `StateError` (`Offscreen
+capture preparation did not finish.`).
+
+The regression test for that cap sets a 2 second timeout. A `package:test`
+timeout uses a timer, so it does not interrupt a synchronous loop that
+never yields. The cap is what makes the failure return.
+
+Not verified:
+
+- Release and profile builds. `BuildOwner.debugBuilding` is false there,
+  including during `build`, and those builds strip Flutter's re-entrant
+  `buildScope` assert.
+- The browser `WebVideoRenderer`.
+- Phones. The desktop widget tests do not certify a phone.
+- Native memory. `debugRenderViewDisposed` records disposal of the view
+  object. It is null when asserts are disabled.
+- Nested `Video` discovery. `compositionVideo` does not cross a `Builder`
+  or another `Video`. A null resolver still skips preparation.
+
 ## Publish and deploy
 
 `publish.yml`, `images.yml`, `docs.yml`, and `website.yml` are blocked.

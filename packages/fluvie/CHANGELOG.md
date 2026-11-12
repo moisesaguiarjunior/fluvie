@@ -5,6 +5,27 @@ the versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1+socialstudio.1] - 2026-11-12
+
+Fork pre-release. Not published to pub.dev. Build metadata keeps a
+`fluvie: ^0.3.1` dependency valid.
+
+### Changed
+
+- The render digest version matches `0.3.1+socialstudio.1`, so cached
+  frames from 0.3.1 are not reused.
+
+### Fixed
+
+- `render` prepares inline, SRT, and VTT captions without a caller
+  `preResolveCaptions` pass.
+
+### Limits
+
+Not verified: release and profile builds, the browser `WebVideoRenderer`,
+phones, native memory, and nested `Video` discovery.
+`BuildOwner.debugBuilding` is false in release and profile.
+
 ## [0.3.1] - 2026-07-16
 
 ### Changed

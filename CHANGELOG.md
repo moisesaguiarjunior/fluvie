@@ -6,6 +6,13 @@ All notable changes to the Fluvie workspace. The format follows
 
 Per-package changelogs live next to each package.
 
+## [0.3.1+socialstudio.1] - 2026-11-12
+
+Fork pre-release of the maintained packages only. Not published.
+`packages/fluvie` and `packages/fluvie_mobile_encoder` carry the capture
+corrections. Other packages stay at upstream 0.3.1. The package changelogs
+list what was not verified.
+
 ## [0.3.0] - 2026-07-15
 
 The single-file release. A Fluvie project is a composition file, an `assets/`
