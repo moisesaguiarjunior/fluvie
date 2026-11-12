@@ -16,6 +16,7 @@
 library;
 
 export 'src/audio/encoding/resolved_audio_track.dart' show ResolvedAudioMix, ResolvedAudioTrack;
+export 'src/composition/runtime/composition_preparation_scope.dart';
 export 'src/composition/runtime/media_collector.dart'
     show collectMediaSources, collectSnapshotSources, collectSnapshots;
 export 'src/core/contracts/beat_detection_service.dart' show BeatDetectionService;

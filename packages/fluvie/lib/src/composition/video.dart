@@ -4,6 +4,7 @@ import 'package:fluvie/src/captions/captions.dart';
 import 'package:fluvie/src/captions/runtime/captions_layer.dart';
 import 'package:fluvie/src/composition/camera/camera.dart';
 import 'package:fluvie/src/composition/camera/camera_layer.dart';
+import 'package:fluvie/src/composition/runtime/composition_preparation_scope.dart';
 import 'package:fluvie/src/composition/runtime/timeline_probe.dart';
 import 'package:fluvie/src/composition/runtime/transition_compositor.dart';
 import 'package:fluvie/src/composition/runtime/video_plan_builder.dart';

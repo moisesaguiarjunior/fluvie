@@ -118,6 +118,17 @@ Future<Uint8List> captureFrames({
   }
 }
 
+/// Counts gold motion pixels in packed RGBA bytes.
+///
+/// The synthetic child is `Color(0xFFF2C14E)`.
+int goldPixelCount(Uint8List rgba) {
+  var count = 0;
+  for (var i = 0; i < rgba.length; i += 4) {
+    if (rgba[i] > 180 && rgba[i + 1] > 120 && rgba[i + 2] < 140) count++;
+  }
+  return count;
+}
+
 /// Counts near-white pixels in packed RGBA bytes.
 int whitePixelCount(Uint8List rgba) {
   var count = 0;
