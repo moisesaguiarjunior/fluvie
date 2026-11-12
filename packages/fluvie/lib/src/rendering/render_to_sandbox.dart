@@ -1,9 +1,11 @@
+// fluvie:large-file-ok: already over the 200-line budget at v0.3.1; one sandbox render entry
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/audio/encoding/resolved_audio_track.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
+import 'package:fluvie/src/composition/runtime/caption_collector.dart';
 import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/contracts/generative_resolver.dart'
     show GenerativeProgress, GenerativeResolver;
@@ -107,6 +109,11 @@ Future<RenderManifest> renderToSandbox({
       onProgress: onGenerativeProgress,
     );
     await resolver.preResolveAll(collectCompositionMedia(composition, generative: generative));
+    final video = compositionVideo(composition);
+    final captionSource = video == null ? null : collectCaptionSource(video);
+    if (captionSource != null) {
+      await resolver.preResolveCaptions(captionSource);
+    }
     await preResolveCompositionClips(
       composition: composition,
       resolver: resolver,
