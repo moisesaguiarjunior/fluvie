@@ -36,6 +36,9 @@ dev_dependencies:
   mocktail: ^1.0.5
 
 flutter:
+  assets:
+    - assets/synthetic-a.srt
+    - assets/synthetic-a.vtt
   plugin:
     platforms:
       android:
