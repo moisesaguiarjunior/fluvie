@@ -522,6 +522,20 @@ else
   failures=$((failures + 1))
 fi
 
+if grep -Eq '^  quality:' "$ci" || grep -q 'melos run analyze' "$ci"; then
+  echo "FAIL ci.yaml still runs the Flutter 3.44 workspace analyze"
+  failures=$((failures + 1))
+elif grep -q '43325730971' "$note" \
+  && grep -q 'analysis_options_deprecated_plugins' "$note" \
+  && grep -q 'discarded_futures' "$note" \
+  && grep -q 'cascade_invocations' "$note" \
+  && grep -q 'unnecessary_unawaited' "$note"; then
+  echo "ok   Flutter 3.44 workspace analyze stays out of ci.yaml; the reason is in docs/fork-maintenance.md"
+else
+  echo "FAIL the 3.44 analyze record is missing from docs/fork-maintenance.md"
+  failures=$((failures + 1))
+fi
+
 notice="$src/../NOTICE"
 if grep -q 'docs/fork-maintenance.md' "$notice" \
   && ! grep -q 'Actions run id are in .github/workflows/ci.yaml' "$notice"; then

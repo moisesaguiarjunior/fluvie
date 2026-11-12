@@ -106,9 +106,34 @@ fixed. The fork's required check is the `Repository checks` job in
 `.github/workflows/quality.yml`.
 
 Other upstream jobs that succeeded on that run stay in `ci.yaml` on Flutter
-3.44.0. They were not re-run locally. Browser render, pana, phone render,
-ffmpeg integration, and `melos run gate` (including the 97% coverage gate)
-were not re-run locally.
+3.44.0. They were not re-run locally before the fork was public. Browser
+render, pana, phone render, ffmpeg integration, and `melos run gate`
+(including the 97% coverage gate) were not re-run locally.
+
+## Flutter 3.44 workspace analyze
+
+The `quality` job in `.github/workflows/ci.yaml` ran format, analyze, and
+lint for the whole workspace on Flutter 3.44.0. On pull request 1, Actions
+run `43325730971` finished that job red. `melos run analyze` failed in the
+two maintained packages:
+
+- `packages/fluvie`: `analysis_options_deprecated_plugins` is not a
+  diagnostic on Flutter 3.44.0 (`unrecognized_error_code` at
+  `analysis_options.yaml:18`). `live_player.dart:78` reports
+  `discarded_futures` for `Ticker.start`.
+- `packages/fluvie_mobile_encoder`: the same unrecognized code at
+  `analysis_options.yaml:17`, plus `cascade_invocations` at
+  `lib/src/offscreen_capture_host.dart:138` and
+  `test/capture/host_lifecycle_test.dart:343`.
+
+The ignore stays so Flutter 3.47.9 can keep the `custom_lint` plugin.
+Wrapping that ticker call in `unawaited` is what 3.44.0 asks for, and it is
+what 3.47.9 reports as `unnecessary_unawaited`. One analyze command cannot
+be strict on both pins. The job is absent from `ci.yaml`. The fork gate
+remains `Repository checks` in `.github/workflows/quality.yml` on Flutter
+3.47.9. The other fourteen jobs in run `43325730971` passed, including
+`ffmpeg_integration` and `example_mobile_render`. This commit does not
+re-run them and does not claim the historical coverage failure is fixed.
 
 ## Capture corrections
 

@@ -30,5 +30,8 @@ What changed, recorded 2026-11-12:
 - The upstream test and coverage jobs are absent from
   .github/workflows/ci.yaml. The reason and the Actions run id are in
   docs/fork-maintenance.md. The historical failures are not claimed fixed.
+- The Flutter 3.44.0 workspace analyze job is absent from that same
+  workflow. It cannot be strict on both 3.44.0 and the fork pin 3.47.9.
+  The pull-request run and the diagnostics are in docs/fork-maintenance.md.
 
 See docs/fork-maintenance.md.
