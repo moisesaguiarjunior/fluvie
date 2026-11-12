@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Local review gate for every commit: format, analysis and tests for each
+# Dart/Flutter package affected by the staged changes (including deletions),
+# and the schema tests when a staged path is under spec/.
+# Checks run on a snapshot of the index, not on the working tree.
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+source tool/hooks/lib.sh
+
+# Upstream grep, size, docs voice, and staged format. Workspace-wide analyze
+# is intentionally not part of this call; see tool/hooks/upstream-gate.sh.
+bash tool/hooks/upstream-gate.sh || exit 1
+
+snapshot="$(mktemp -d)"
+trap 'rm -rf "$snapshot"' EXIT
+git diff --cached --name-only --no-renames -z >"$snapshot/changed-paths"
+[ -s "$snapshot/changed-paths" ] || exit 0
+# Keep metadata outside the index snapshot to avoid overwriting staged files.
+changed="$snapshot/changed-paths"
+mkdir "$snapshot/content"
+git checkout-index --all --prefix="$snapshot/content/"
+
+if hook_checks_required <"$changed"; then
+  check_hook_suite "$snapshot/content" || exit 1
+fi
+if spec_checks_required <"$changed"; then
+  echo "pre-commit: checking spec (staged content)"
+  check_spec "$snapshot/content" || exit 1
+fi
+
+packages="$(
+  while IFS= read -r -d '' path; do
+    package_of "$snapshot/content" "$path"
+    packages_for_root_meta "$snapshot/content" "$path"
+  done <"$changed" | sort -u
+)"
+[ -z "$packages" ] && exit 0
+
+while IFS= read -r pkg; do
+  echo "pre-commit: checking $pkg (staged content)"
+  check_package "$snapshot/content/$pkg"
+done <<<"$packages"

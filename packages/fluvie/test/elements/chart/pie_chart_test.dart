@@ -18,6 +18,7 @@ import 'package:fluvie/src/elements/chart/pie_chart.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller_scope.dart';
 import 'package:fluvie/src/timing/scene_scope.dart';
+import 'package:fluvie/src/timing/time_scope_data.dart';
 import 'package:fluvie/src/timing/video_scope.dart';
 
 /// The size every probe mounts the chart at, so the geometry is known.
@@ -197,6 +198,21 @@ void main() {
         frame: 13,
       );
       expect(second.sweepAngles, firstAngles);
+    });
+  });
+
+  group('non-finite segment values', () {
+    test('a NaN segment is angle zero and stays out of the total', () {
+      final painter = buildPiePainter(
+        frame: 30,
+        scope: const TimeScopeData(fps: 30, startFrame: 0, durationFrames: 120),
+        data: {'A': 1, 'invalid': double.nan},
+        reveal: const Time.frames(30),
+      );
+      expect(painter.fullAngles, hasLength(2));
+      expect(painter.fullAngles[0], closeTo(2 * math.pi, 0.0001));
+      expect(painter.fullAngles[1].isFinite, isTrue);
+      expect(painter.fullAngles[1], 0);
     });
   });
 }

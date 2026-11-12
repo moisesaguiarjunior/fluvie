@@ -7,6 +7,19 @@ formatter:
   page_width: 100
 
 analyzer:
+  errors:
+    # 2026-11-12: Flutter 3.47.9 reports analyzer.plugins as the legacy
+    # custom_lint registration. The plugin stays so fluvie_lints still run.
+    # included_file_warning repeats that diagnostic from including files.
+    # The exclude list below is the Flutter 3.47.9 migration for this
+    # plugin package (build, android, ios). It keeps `flutter test` from
+    # rewriting this file on every run.
+    analysis_options_deprecated_plugins: ignore
+    included_file_warning: ignore
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
   plugins:
     - custom_lint
 

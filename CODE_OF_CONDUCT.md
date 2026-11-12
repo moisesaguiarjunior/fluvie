@@ -37,7 +37,11 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders responsible for enforcement at simon.auer@marqably.com. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior in the upstream Fluvie project may be reported to the community leaders responsible for enforcement at simon.auer@marqably.com.
+
+This repository is a fork. Reports about conduct in this fork go to moisesaguiarjunior@gmail.com. That address is the fork maintainer's contact. It does not replace the upstream contact, and the upstream project has not endorsed this fork.
+
+All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the reporter of any incident.
 

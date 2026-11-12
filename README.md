@@ -12,6 +12,8 @@
   <a href="https://melos.invertase.dev"><img src="https://img.shields.io/badge/maintained%20with-melos-f700ff.svg" alt="maintained with melos"></a>
 </p>
 
+> **Fork.** This repository is a fork of [SimonErich/fluvie](https://github.com/SimonErich/fluvie) at tag `v0.3.1` (`4134dbb0d7dd873c5bdecaccb020183369a0e2e7`). The upstream project has not endorsed it. The MIT license and Simon Auer's copyright stay in [`LICENSE`](LICENSE); see [`NOTICE`](NOTICE). The badges above describe the upstream project. This fork is not on pub.dev. Maintained here: `packages/fluvie` and `packages/fluvie_mobile_encoder`. Other packages stay as upstream published them. This delivery changes repository gates only. Capture corrections are not in this tree. Details: [`docs/fork-maintenance.md`](docs/fork-maintenance.md).
+
 **Fluvie is a Flutter package that turns widget code into real video files.** You
 build a video the way you build a screen, with `Scene`s and the Flutter widgets
 you already know, you say how long each thing lasts, and Fluvie renders every
@@ -314,14 +316,20 @@ need it; reach for it when a shader or a blend mode looks wrong.
 
 ## Contributing
 
-Pull up a chair. Read [CONTRIBUTING.md](CONTRIBUTING.md), install the hooks once,
-and keep the gate green:
+Pull up a chair. Read [CONTRIBUTING.md](CONTRIBUTING.md), install the fork
+hooks once, and keep the fork gate green:
 
 ```sh
 dart pub get && dart run melos bootstrap
-bash .githooks/install.sh
-CI=true dart run melos run gate
+bash tool/install-hooks.sh
+bash tool/check.sh
 ```
+
+`bash tool/check.sh` is the required check for this fork. It covers the hook
+regressions and the maintained packages. The upstream installer
+`.githooks/install.sh` points `core.hooksPath` at `.githooks` and replaces
+these hooks. The upstream workspace gate stays documented in
+[CONTRIBUTING.md](CONTRIBUTING.md). This fork does not claim that gate is green.
 
 ## Community
 

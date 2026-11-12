@@ -1,0 +1,30 @@
+This repository is a fork of Fluvie.
+
+Fluvie
+Copyright (c) 2026 Simon Auer
+https://github.com/SimonErich/fluvie
+
+Base: tag v0.3.1, commit 4134dbb0d7dd873c5bdecaccb020183369a0e2e7
+License: MIT (see LICENSE)
+
+The upstream project has not endorsed this fork.
+
+This delivery changes repository gates only. Capture corrections are not in
+this tree. Maintained packages are packages/fluvie and
+packages/fluvie_mobile_encoder. Other workspace packages stay as upstream
+published them at v0.3.1.
+
+What changed, recorded 2026-11-12:
+
+- Review hooks, tool/check.sh, a pull request template, a ruleset
+  declaration, and a quality workflow for the maintained packages.
+- Analyzer adjustments required by Flutter 3.47.9, with a dated ignore for
+  the legacy custom_lint plugin registration.
+- A lockfile refresh required by that same Flutter pin.
+- Publish, image, docs, and website workflows blocked so this fork cannot
+  publish or deploy as upstream.
+- The upstream test and coverage jobs are absent from
+  .github/workflows/ci.yaml. The reason and the Actions run id are in
+  docs/fork-maintenance.md. The historical failures are not claimed fixed.
+
+See docs/fork-maintenance.md.
