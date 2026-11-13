@@ -581,11 +581,27 @@ if printf '%s\n' "$badges" | grep -q "badge/pub-${fluvie_version_badge}-blue" \
   && ! printf '%s\n' "$badges" | grep -q 'SimonErich/fluvie/actions' \
   && ! printf '%s\n' "$badges" | grep -q 'img.shields.io/pub/v/' \
   && ! printf '%s\n' "$badges" | grep -q 'codecov.io/gh/SimonErich' \
-  && grep -q 'uploads no coverage report' "$readme" \
+  && grep -q 'the coverage workflow uploads that report' "$readme" \
   && ! grep -q 'badges describe the upstream project' "$readme"; then
   echo "ok   README badges point at this fork and keep the MIT license"
 else
   echo "FAIL README badges still describe upstream CI, pub.dev, Codecov, or melos"
+  failures=$((failures + 1))
+fi
+
+coverage_workflow="$src/../.github/workflows/coverage.yml"
+coverage_script="$src/../tool/coverage.sh"
+if grep -q "flutter-version: '3.47.9'" "$coverage_workflow" \
+  && grep -q 'bash tool/coverage.sh' "$coverage_workflow" \
+  && grep -q 'files: coverage/lcov.info' "$coverage_workflow" \
+  && grep -q 'disable_search: true' "$coverage_workflow" \
+  && grep -q 'packages/fluvie' "$coverage_script" \
+  && grep -q 'packages/fluvie_mobile_encoder' "$coverage_script" \
+  && ! grep -q 'melos run coverage:check' "$coverage_workflow" \
+  && ! grep -q -- '--min 97' "$coverage_workflow"; then
+  echo "ok   coverage workflow measures the two maintained packages"
+else
+  echo "FAIL coverage workflow is missing the maintained-package report"
   failures=$((failures + 1))
 fi
 
