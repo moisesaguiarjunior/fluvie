@@ -1,54 +1,23 @@
 name: docs
 
-# Build the documentation site (docs.fluvie.dev) with Astro Starlight and publish
-# it to GitHub Pages. Enable Pages with "Source: GitHub Actions" in the repo
-# settings, then add the docs.fluvie.dev custom domain (see RELEASE.md).
+# FORK_PUBLISH_BLOCKED
+# This fork does not deploy docs.fluvie.dev or GitHub Pages.
+# Git history of tag v0.3.1 still has the upstream docs workflow.
+# A manual run fails closed. Pushes do not deploy.
+# Recorded 2026-11-12.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - documentation/**
-      - web/docs/**
-      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  build:
+  blocked:
+    name: Docs deploy is blocked on this fork
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web/docs
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/docs/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      # Serve the custom domain from the Pages deploy.
-      - run: echo "docs.fluvie.dev" > dist/CNAME
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web/docs/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Refuse to deploy docs
+        run: |
+          echo "FORK_PUBLISH_BLOCKED: this fork does not deploy the docs site."
+          exit 1

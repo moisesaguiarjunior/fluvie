@@ -9,6 +9,16 @@ formatter:
   page_width: 100
 
 analyzer:
+  errors:
+    # 2026-11-12: Flutter 3.47.9 reports analyzer.plugins as the legacy
+    # custom_lint registration (analysis_options_deprecated_plugins). The
+    # plugin stays so fluvie_lints still run. included_file_warning is the
+    # same diagnostic repeated by files that include this one. This ignore
+    # also suppresses any other included-file warning in this package.
+    analysis_options_deprecated_plugins: ignore
+    included_file_warning: ignore
+  exclude:
+    - build/**
   plugins:
     - custom_lint
 

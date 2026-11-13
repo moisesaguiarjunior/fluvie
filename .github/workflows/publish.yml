@@ -1,83 +1,26 @@
 name: publish
 
-# Publish every package to pub.dev when the umbrella release tag is pushed — the
-# same `v<version>` tag that builds the images. All packages share one version
-# (lockstep), so the tag `v0.1.2` publishes the 0.1.2 pubspec of each package.
-#
-# For pub.dev's OIDC check to pass, set each package's tag pattern under
-# Admin -> Automated publishing to `v{{version}}` (not `{{package}}-v{{version}}`).
-# Creating a GitHub Release for the tag (or `git push` of the tag) triggers this.
-# A brand-new package has no Admin page yet, so its first version must be
-# published manually (`dart pub publish` once); the tag automates every release
-# after that.
-#
-# The inter-package constraints track the release version (`tool/set_version.sh`
-# rewrites them on every bump), so each dependent's constraint names the version
-# being published in this same run. The `needs:` chains below order the jobs so
-# a package only publishes after its in-repo dependencies are on pub.dev.
+# FORK_PUBLISH_BLOCKED
+# This fork does not publish packages to pub.dev.
+# Git history of tag v0.3.1 still has the upstream publish workflow.
+# A version tag or a manual run fails closed instead of publishing.
+# Publishing needs a new package name and a maintainer decision.
+# Recorded 2026-11-12.
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
+permissions:
+  contents: read
+
 jobs:
-  fluvie:
-    permissions:
-      id-token: write # OIDC token for pub.dev
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie
-
-  fluvie_cli:
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_cli
-
-  fluvie_lints:
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_lints
-
-  fluvie_ai:
-    needs: [fluvie]
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_ai
-
-  fluvie_mobile_encoder:
-    needs: [fluvie]
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_mobile_encoder
-
-  fluvie_web_encoder:
-    needs: [fluvie]
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_web_encoder
-
-  fluvie_validate:
-    needs: [fluvie, fluvie_lints]
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_validate
-
-  fluvie_server:
-    needs: [fluvie_cli, fluvie_validate]
-    permissions:
-      id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: packages/fluvie_server
+  blocked:
+    name: Publishing is blocked on this fork
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to publish
+        run: |
+          echo "FORK_PUBLISH_BLOCKED: this fork does not publish to pub.dev."
+          exit 1

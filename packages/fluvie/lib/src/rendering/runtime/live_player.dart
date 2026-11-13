@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/rendering/runtime/live_playback_controller.dart';
@@ -75,8 +73,9 @@ class _LivePlayerState extends State<LivePlayer> with SingleTickerProviderStateM
     final playing = widget.controller.state == LivePlaybackState.playing;
     if (playing && !_ticker.isActive) {
       // The TickerFuture resolves when the ticker stops; playback state is
-      // tracked on the controller, so nothing awaits it.
-      unawaited(_ticker.start());
+      // tracked on the controller, so nothing awaits it. start() is marked
+      // @awaitNotRequired.
+      _ticker.start();
     } else if (!playing && _ticker.isActive) {
       _ticker.stop();
     }

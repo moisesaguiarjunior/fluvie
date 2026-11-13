@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Last gate before anything becomes public:
+#  1. refuses pushes to main and branch deletions;
+#  2. requires a local independent review attestation for the exact commit
+#     being pushed (see tool/record-review.sh);
+#  3. runs the full checks on every commit that would become public, i.e.
+#     every commit not already present on the push destination.
+#
+# git calls this hook with the remote name as $1 and the URL actually pushed
+# to as $2. What is already public is asked from that URL itself: local
+# remote-tracking refs may describe another place (a backup, or a fetch URL
+# different from the push URL).
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+source tool/hooks/lib.sh
+
+push_url="${2:?pre-push: push URL expected}"
+
+# Commits the destination already has (only those that exist locally can be
+# excluded). If the destination cannot be queried, refuse: fail closed.
+if ! advertised="$(git ls-remote "$push_url" 2>/dev/null)"; then
+  echo "pre-push: cannot query $push_url to know what is already public." >&2
+  exit 1
+fi
+published=()
+while read -r sha _ref; do
+  [ -n "$sha" ] && git cat-file -e "$sha^{commit}" 2>/dev/null && published+=("$sha")
+done <<<"$advertised"
+zero="0000000000000000000000000000000000000000"
+# Same location as tool/record-review.sh: shared by every linked worktree.
+reviews="$(git rev-parse --path-format=absolute --git-common-dir)/fluvie-reviews"
+status=0
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: pushing to main is not allowed; open a pull request." >&2
+    exit 1
+  fi
+  if [ "$local_sha" = "$zero" ]; then
+    echo "pre-push: deleting remote branches from the command line is not allowed." >&2
+    exit 1
+  fi
+
+  attestation="$reviews/$local_sha"
+  if [ ! -f "$attestation" ]; then
+    echo "pre-push: no independent review recorded for $local_sha." >&2
+    echo "          The reviewer runs tool/record-review.sh on this exact commit." >&2
+    exit 1
+  fi
+  if ! grep -qx 'outcome: no-blocking-findings' "$attestation"; then
+    echo "pre-push: the review of $local_sha did not end with no-blocking-findings." >&2
+    exit 1
+  fi
+
+  # ${a[@]+"${a[@]}"} keeps an empty list valid under `set -u` in bash 3.2.
+  commits="$(git rev-list --reverse "$local_sha" --not ${published[@]+"${published[@]}"} --)"
+
+  for commit in $commits; do
+    snapshot="$(mktemp -d)"
+    git archive "$commit" | tar -x -C "$snapshot"
+    changed="$(mktemp)"
+    git diff-tree --root --no-commit-id --name-only --no-renames -z -r -m "$commit" >"$changed"
+    if hook_checks_required <"$changed"; then
+      echo "pre-push: checking hook regressions at ${commit:0:7}"
+      check_hook_suite "$snapshot" || status=1
+    fi
+    if spec_checks_required <"$changed"; then
+      echo "pre-push: checking spec at ${commit:0:7}"
+      check_spec "$snapshot" || status=1
+    fi
+    pkglist="$(mktemp)"
+    if ! packages_for_push "$snapshot" "$changed" >"$pkglist"; then
+      echo "pre-push: package selection failed at ${commit:0:7}." >&2
+      status=1
+    else
+      while IFS= read -r pkg; do
+        [ -n "$pkg" ] || continue
+        echo "pre-push: checking ${pkg#"$snapshot"/} at ${commit:0:7}"
+        check_package "$pkg" || status=1
+      done <"$pkglist"
+    fi
+    rm -f "$pkglist" "$changed"
+    rm -rf "$snapshot"
+  done
+done
+
+exit "$status"

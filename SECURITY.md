@@ -7,10 +7,17 @@ The latest `0.x` release receives security fixes. Older builds do not. Once
 
 ## Reporting a vulnerability
 
-Use GitHub's [private vulnerability reporting](https://github.com/SimonErich/fluvie/security/advisories/new)
-to open a report, or email **simon.auer@marqably.com** if you prefer. Include a
-description and, if possible, a minimal reproduction. Please do not open a public
-issue for security reports. You will get an acknowledgement within a few days.
+Reports about a vulnerability in this fork go to moisesaguiarjunior@gmail.com.
+That address is the fork maintainer's contact. Include a description and, if
+possible, a minimal reproduction. Do not open a public issue for a security
+report. GitHub private vulnerability reporting for this fork is unavailable
+until the public repository exists.
+
+Reports about a vulnerability in the upstream project go to
+simon.auer@marqably.com, or through
+[GitHub private vulnerability reporting](https://github.com/SimonErich/fluvie/security/advisories/new)
+on SimonErich/fluvie. That address is the upstream contact. It does not replace
+the fork contact, and the upstream project has not endorsed this fork.
 
 ## Design guarantees you can hold us to
 

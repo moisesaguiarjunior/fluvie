@@ -84,7 +84,12 @@ final class VideoState extends State<Video> {
   Widget build(BuildContext context) {
     if (!_registrar.isResolved && !_resolveScheduled) {
       _resolveScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback(_resolveSchedules);
+      final preparation = CompositionPreparationScope.maybeOf(context);
+      if (preparation == null) {
+        WidgetsBinding.instance.addPostFrameCallback(_resolveSchedules);
+      } else {
+        preparation.schedule(() => _resolveSchedules(Duration.zero));
+      }
     }
     final offsets = widget._offsets;
     return VideoScope(

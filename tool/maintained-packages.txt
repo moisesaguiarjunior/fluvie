@@ -1,0 +1,5 @@
+# Packages this fork checks in tool/check.sh and in CI.
+# A missing path fails closed. Other workspace packages stay at upstream
+# v0.3.1. A commit that touches one of them is still checked by the hooks.
+packages/fluvie
+packages/fluvie_mobile_encoder

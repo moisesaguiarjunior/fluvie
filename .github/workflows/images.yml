@@ -1,99 +1,25 @@
 name: images
 
-# Build and push the service container images to the GitHub Container Registry
-# (ghcr.io) on a release tag, e.g. `git tag v0.1.0 && git push origin v0.1.0`,
-# then ping each service's Dokploy deploy webhook so it pulls the new image and
-# restarts. The images are public and need no token to pull; pushing uses
-# GITHUB_TOKEN.
-#
-# Build and redeploy are one matrix job per service, so the services are
-# independent: if one image fails to build, the others still build and redeploy
-# (fail-fast is off, and a failed build stops only its own leg). For the redeploy
-# to pull the new build, point each Dokploy app at a moving tag (`:latest` or
-# `:0.1`), not a pinned `:0.1.0`. A missing webhook secret just skips that
-# service's redeploy, so a release never fails on an unset webhook.
+# FORK_PUBLISH_BLOCKED
+# This fork does not push container images or call deploy webhooks.
+# Git history of tag v0.3.1 still has the upstream image workflow.
+# A version tag or a manual run fails closed instead of pushing.
+# Recorded 2026-11-12.
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
-  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  release:
+  blocked:
+    name: Image publish is blocked on this fork
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: fluvie-server
-            dockerfile: deploy/server.Dockerfile
-            hook: DOKPLOY_WEBHOOK_SERVER
-          - name: fluvie-server-docs
-            dockerfile: deploy/server-docs.Dockerfile
-            hook: DOKPLOY_WEBHOOK_SERVER_DOCS
-          - name: fluvie-demo
-            dockerfile: deploy/demo.Dockerfile
-            hook: DOKPLOY_WEBHOOK_DEMO
-          - name: fluvie-examples
-            dockerfile: deploy/examples.Dockerfile
-            hook: DOKPLOY_WEBHOOK_EXAMPLES
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-      - uses: docker/build-push-action@v6
-        # Disable the post-push GitHub build summary/record upload and the
-        # provenance attestation: both call the flaky GitHub Actions API, which
-        # has been 404ing and failing the step AFTER the image already pushed —
-        # which then skips the redeploy webhook below. The image is all we need.
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          push: true
-          provenance: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          # ignore-error: a flaky GitHub Actions cache export (it intermittently
-          # 404s on a large mode=max layer set) must not fail the build after the
-          # image has already pushed, which would skip the redeploy webhook below.
-          cache-to: type=gha,mode=max,ignore-error=true
-      # Ping this service's Dokploy webhook so it pulls the image just pushed and
-      # restarts. Skipped (not failed) when the webhook secret is unset; a failed
-      # build above stops the leg before this runs, leaving the other services'
-      # legs untouched.
-      - name: Redeploy ${{ matrix.name }}
-        env:
-          DOKPLOY_WEBHOOK_SERVER: ${{ secrets.DOKPLOY_WEBHOOK_SERVER }}
-          DOKPLOY_WEBHOOK_SERVER_DOCS: ${{ secrets.DOKPLOY_WEBHOOK_SERVER_DOCS }}
-          DOKPLOY_WEBHOOK_DEMO: ${{ secrets.DOKPLOY_WEBHOOK_DEMO }}
-          DOKPLOY_WEBHOOK_EXAMPLES: ${{ secrets.DOKPLOY_WEBHOOK_EXAMPLES }}
-          HOOK_VAR: ${{ matrix.hook }}
+      - name: Refuse to push images
         run: |
-          set -euo pipefail
-          HOOK="${!HOOK_VAR:-}"
-          if [ -z "$HOOK" ]; then
-            echo "$HOOK_VAR not set; skipping ${{ matrix.name }} redeploy."
-            exit 0
-          fi
-          curl -fsS -X POST "$HOOK"
-          echo "Pinged the ${{ matrix.name }} redeploy webhook."
+          echo "FORK_PUBLISH_BLOCKED: this fork does not push container images."
+          exit 1

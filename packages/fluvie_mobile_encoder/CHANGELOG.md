@@ -3,6 +3,26 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1+socialstudio.1] - 2026-11-12
+
+Fork pre-release. Not published to pub.dev.
+
+### Fixed
+
+- `renderToSandbox` prepares inline, SRT, and VTT captions without a caller
+  `preResolveCaptions` pass.
+- Offscreen capture resolves motion without an application frame, rejects
+  capture during an application build, and disposes the view after the
+  frame when dispose starts from `State.dispose`.
+
+### Limits
+
+Not verified: release and profile builds, the browser `WebVideoRenderer`,
+phones, native memory, and nested `Video` discovery.
+`BuildOwner.debugBuilding` is false in release and profile.
+`debugRenderViewDisposed` records disposal of the view object. It is null
+when asserts are disabled, and it is not a measurement of native memory.
+
 ## [0.3.1] - 2026-07-16
 
 Lockstep release with the rest of the Fluvie workspace.

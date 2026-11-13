@@ -24,10 +24,11 @@ const double _radiusFraction = 0.45;
 /// painter.
 ///
 /// Each segment's full angle is `2 pi x value / total`, so the segments sum to a
-/// full turn at progress `1`. The whole disc sweeps angularly with
-/// [revealProgress]; the painter scales each full angle by `ease(progress)`
-/// when it draws. [innerRadius] is `0` for a pie and a fraction in `(0, 1)` for a
-/// donut hole.
+/// full turn at progress `1`. A value that is not greater than zero, including
+/// `NaN`, contributes angle `0` and is left out of the total. The whole disc
+/// sweeps angularly with [revealProgress]; the painter scales each full angle by
+/// `ease(progress)` when it draws. [innerRadius] is `0` for a pie and a fraction
+/// in `(0, 1)` for a donut hole.
 PieChartPainter buildPiePainter({
   required int frame,
   required TimeScopeData scope,
@@ -39,7 +40,8 @@ PieChartPainter buildPiePainter({
   final values = data.values.toList();
   final total = values.fold<num>(0, (sum, v) => sum + (v > 0 ? v : 0));
   final fullAngles = [
-    for (final value in values) total <= 0 ? 0.0 : 2 * math.pi * (value > 0 ? value : 0) / total,
+    for (final value in values)
+      if (total <= 0 || !(value > 0)) 0.0 else 2 * math.pi * value / total,
   ];
   return PieChartPainter(
     tokens: tokens,

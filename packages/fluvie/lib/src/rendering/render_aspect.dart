@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart' show GlobalKey, Widget;
 import 'package:fluvie/src/audio/encoding/audio_mix_staging.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/composition/runtime/audio_collector.dart';
+import 'package:fluvie/src/composition/runtime/caption_collector.dart';
 import 'package:fluvie/src/composition/runtime/clip_plan_collector.dart'
     show ClipAudioPlan, collectClipAudioPlans;
 import 'package:fluvie/src/composition/video.dart';
@@ -113,6 +114,11 @@ Future<RenderAspectResult> render({
       onProgress: onGenerativeProgress,
     );
     await resolver.preResolveAll(collectCompositionMedia(composition, generative: generative));
+    final video = compositionVideo(composition);
+    final captionSource = video == null ? null : collectCaptionSource(video);
+    if (captionSource != null) {
+      await resolver.preResolveCaptions(captionSource);
+    }
     await preResolveCompositionClips(
       composition: composition,
       resolver: resolver,
