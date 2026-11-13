@@ -222,8 +222,11 @@ deletion.
 Applied on GitHub on 2026-11-12 as ruleset `27165183`, only for
 `refs/heads/main`. The create call defaulted an extra approval for
 unattributed changes. That flag was turned off so the live rule matches
-this file. `main` on the public fork is still the upstream mirror. The
-reviewed line is not that branch.
+this file. On 2026-11-13 `main` moved to `890543e`, the reviewed tip of
+the v0.3.1 line, and became the default branch. `10e442c` remains
+upstream `main` and is not an ancestor of `890543e`. The ruleset stayed
+active on `refs/heads/main` after that move. This paragraph is not in
+the published `890543e`.
 
 ## Hooks
 
