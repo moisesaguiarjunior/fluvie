@@ -16,7 +16,8 @@ maintained packages' issue trackers point here. The Flutter 3.44.0
 workspace analyze is no longer a workflow job. The root README header
 badges name this pre-release, this repository's quality workflow, and
 this repository's Codecov page. Agent instructions install `tool/hooks`
-and send fork issues to this repository.
+and send fork issues to this repository. The 3.44 analyze note separates
+the pin conflict from `cascade_invocations`.
 
 ## [0.3.0] - 2026-07-15
 

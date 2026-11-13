@@ -128,10 +128,12 @@ two maintained packages:
 
 The ignore stays so Flutter 3.47.9 can keep the `custom_lint` plugin.
 Wrapping that ticker call in `unawaited` is what 3.44.0 asks for, and it is
-what 3.47.9 reports as `unnecessary_unawaited`. One analyze command cannot
-be strict on both pins. The job is absent from `ci.yaml`. The fork gate
-remains `Repository checks` in `.github/workflows/quality.yml` on Flutter
-3.47.9. The other fourteen jobs in run `43325730971` passed, including
+what 3.47.9 reports as `unnecessary_unawaited`. Those two diagnostics cannot
+be strict in one analyze command. Flutter 3.47.9 does not report
+`cascade_invocations` at `offscreen_capture_host.dart:138` or
+`host_lifecycle_test.dart:343`. The job is absent from `ci.yaml` because
+this fork's gate is Flutter 3.47.9. The fork gate remains `Repository checks`
+in `.github/workflows/quality.yml` on Flutter 3.47.9. The other fourteen jobs in run `43325730971` passed, including
 `ffmpeg_integration` and `example_mobile_render`. This commit does not
 re-run them and does not claim the historical coverage failure is fixed.
 

@@ -529,7 +529,9 @@ elif grep -q '43325730971' "$note" \
   && grep -q 'analysis_options_deprecated_plugins' "$note" \
   && grep -q 'discarded_futures' "$note" \
   && grep -q 'cascade_invocations' "$note" \
-  && grep -q 'unnecessary_unawaited' "$note"; then
+  && grep -q 'unnecessary_unawaited' "$note" \
+  && grep -Fq 'Flutter 3.47.9 does not report' "$note" \
+  && grep -Fq 'cannot pass on Flutter 3.44.0 while the code is' "$ci"; then
   echo "ok   Flutter 3.44 workspace analyze stays out of ci.yaml; the reason is in docs/fork-maintenance.md"
 else
   echo "FAIL the 3.44 analyze record is missing from docs/fork-maintenance.md"

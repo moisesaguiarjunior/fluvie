@@ -18,8 +18,9 @@ env:
 
 jobs:
   # The workspace quality job (format, analyze, and lint on Flutter 3.44.0)
-  # is absent. That analyze cannot pass on the fork pin, Flutter 3.47.9.
-  # The reason is in docs/fork-maintenance.md. The fork gate is quality.yml.
+  # is absent. That analyze cannot pass on Flutter 3.44.0 while the code is
+  # strict for the fork pin, Flutter 3.47.9. The reason is in
+  # docs/fork-maintenance.md. The fork gate is quality.yml.
 
   docs:
     runs-on: ubuntu-latest
