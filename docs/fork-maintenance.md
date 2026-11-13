@@ -180,13 +180,18 @@ a new package name and a maintainer decision.
 
 `.github/rulesets/main.json` declares pull-request merges, linear history,
 no force-push, no branch deletion, and a strict required check named
-`Repository checks`. It was not applied on GitHub: this delivery does not
-create the public fork. The pull-request rule sets
+`Repository checks`. The pull-request rule sets
 `required_approving_review_count` to 0, so the JSON is not a server-side
 approval requirement. Independent review of the exact commit is the local
 pre-push record, and it applies in a checkout that uses `tool/hooks`. The
 local pre-push hook already refuses a push to `main` and a remote branch
 deletion.
+
+Applied on GitHub on 2026-11-12 as ruleset `27165183`, only for
+`refs/heads/main`. The create call defaulted an extra approval for
+unattributed changes. That flag was turned off so the live rule matches
+this file. `main` on the public fork is still the upstream mirror. The
+reviewed line is not that branch.
 
 ## Hooks
 

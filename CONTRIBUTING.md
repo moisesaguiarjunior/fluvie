@@ -25,7 +25,8 @@ not pushed. The pre-push hook refuses a push to `main`.
 The fork's required check is `bash tool/check.sh` (hook regressions, the
 upstream hook self-test, format, strict analysis, and the default tests for
 `packages/fluvie` and `packages/fluvie_mobile_encoder`). CI runs that script
-on Flutter 3.47.9. See the quality workflow.
+on Flutter 3.47.9. See the quality workflow. Reusable entry points are
+listed in [docs/reuse.md](docs/reuse.md).
 
 `CI=true dart run melos run gate` remains the upstream standard, including
 coverage of packages this fork does not maintain. The tag's coverage job
@@ -35,7 +36,7 @@ pub.dev from this fork.
 ## Setup
 
 ```sh
-git clone https://github.com/SimonErich/fluvie.git && cd fluvie
+git clone https://github.com/moisesaguiarjunior/fluvie.git && cd fluvie
 dart pub get                       # resolves the workspace root
 dart run melos bootstrap           # resolves all packages
 bash tool/install-hooks.sh         # fork hooks (required)

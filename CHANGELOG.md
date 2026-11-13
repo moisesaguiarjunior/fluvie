@@ -11,7 +11,10 @@ Per-package changelogs live next to each package.
 Fork pre-release of the maintained packages only. Not published.
 `packages/fluvie` and `packages/fluvie_mobile_encoder` carry the capture
 corrections. Other packages stay at upstream 0.3.1. The package changelogs
-list what was not verified.
+list what was not verified. Contributor setup clones this fork. The
+maintained packages' issue trackers point here. The Flutter 3.44.0
+workspace analyze is no longer a workflow job. Agent instructions install `tool/hooks`
+and send fork issues to this repository.
 
 ## [0.3.0] - 2026-07-15
 

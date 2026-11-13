@@ -14,6 +14,8 @@ Fork pre-release. Not published to pub.dev. Build metadata keeps a
 
 - The render digest version matches `0.3.1+socialstudio.1`, so cached
   frames from 0.3.1 are not reused.
+- `repository` and `issue_tracker` point at this fork. The homepage and
+  the upstream funding link stay with the upstream project.
 
 ### Fixed
 

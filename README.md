@@ -6,13 +6,14 @@
 
 <p align="center">
   <a href="https://pub.dev/packages/fluvie"><img src="https://img.shields.io/pub/v/fluvie.svg" alt="pub package"></a>
-  <a href="https://github.com/SimonErich/fluvie/actions/workflows/ci.yaml"><img src="https://github.com/SimonErich/fluvie/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/moisesaguiarjunior/fluvie/actions/workflows/quality.yml"><img src="https://github.com/moisesaguiarjunior/fluvie/actions/workflows/quality.yml/badge.svg" alt="Fork checks"></a>
+  <a href="https://github.com/SimonErich/fluvie/actions/workflows/ci.yaml"><img src="https://github.com/SimonErich/fluvie/actions/workflows/ci.yaml/badge.svg" alt="Upstream CI"></a>
   <a href="https://codecov.io/gh/SimonErich/fluvie"><img src="https://codecov.io/gh/SimonErich/fluvie/branch/main/graph/badge.svg" alt="coverage"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-purple.svg" alt="License: MIT"></a>
   <a href="https://melos.invertase.dev"><img src="https://img.shields.io/badge/maintained%20with-melos-f700ff.svg" alt="maintained with melos"></a>
 </p>
 
-> **Fork.** This repository is a fork of [SimonErich/fluvie](https://github.com/SimonErich/fluvie) at tag `v0.3.1` (`4134dbb0d7dd873c5bdecaccb020183369a0e2e7`). The upstream project has not endorsed it. The MIT license and Simon Auer's copyright stay in [`LICENSE`](LICENSE); see [`NOTICE`](NOTICE). The badges above describe the upstream project. This fork is not on pub.dev. Maintained here: `packages/fluvie` and `packages/fluvie_mobile_encoder`. Other packages stay as upstream published them. Maintained packages are `0.3.1+socialstudio.1` and are not published. `render` and `renderToSandbox` prepare captions, and the offscreen host resolves motion without an application frame. Not verified here: release and profile builds, the browser `WebVideoRenderer`, phones, native memory, and nested `Video` discovery. `BuildOwner.debugBuilding` is false in release and profile. Details: [`docs/fork-maintenance.md`](docs/fork-maintenance.md).
+> **Fork.** This repository is a fork of [SimonErich/fluvie](https://github.com/SimonErich/fluvie) at tag `v0.3.1` (`4134dbb0d7dd873c5bdecaccb020183369a0e2e7`). The upstream project has not endorsed it. The MIT license and Simon Auer's copyright stay in [`LICENSE`](LICENSE); see [`NOTICE`](NOTICE). The fork-checks badge is this repository's quality workflow. The pub.dev, upstream CI, and coverage badges describe the upstream project. This fork is not on pub.dev. Maintained here: `packages/fluvie` and `packages/fluvie_mobile_encoder`. Other packages stay as upstream published them. Maintained packages are `0.3.1+socialstudio.1` and are not published. `render` and `renderToSandbox` prepare captions, and the offscreen host resolves motion without an application frame. Not verified here: release and profile builds, the browser `WebVideoRenderer`, phones, native memory, and nested `Video` discovery. `BuildOwner.debugBuilding` is false in release and profile. Details: [`docs/fork-maintenance.md`](docs/fork-maintenance.md).
 
 **Fluvie is a Flutter package that turns widget code into real video files.** You
 build a video the way you build a screen, with `Scene`s and the Flutter widgets
@@ -333,8 +334,8 @@ these hooks. The upstream workspace gate stays documented in
 
 ## Community
 
-- [Discussions](https://github.com/SimonErich/fluvie/discussions): questions and ideas.
-- [Issues](https://github.com/SimonErich/fluvie/issues): bugs and feature requests.
+- [Discussions](https://github.com/SimonErich/fluvie/discussions): questions and ideas for the upstream project.
+- [Issues](https://github.com/moisesaguiarjunior/fluvie/issues): bugs and feature requests for this fork.
 - [Code of Conduct](CODE_OF_CONDUCT.md) and [Security policy](SECURITY.md).
 
 ## License

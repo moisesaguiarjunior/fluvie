@@ -7,6 +7,11 @@ the versions follow [Semantic Versioning](https://semver.org/).
 
 Fork pre-release. Not published to pub.dev.
 
+### Changed
+
+- `repository` and `issue_tracker` point at this fork. The homepage and
+  the upstream funding link stay with the upstream project.
+
 ### Fixed
 
 - `renderToSandbox` prepares inline, SRT, and VTT captions without a caller

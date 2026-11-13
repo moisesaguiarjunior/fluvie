@@ -7,6 +7,26 @@ You describe **what** the video is; Fluvie computes **when** everything happens.
 > public API and the design decisions behind it. When code and spec disagree, the
 > spec is the intended behavior — fix the code or update the spec deliberately.
 
+## This fork
+
+This working agreement applies to the fork of SimonErich/fluvie at tag
+`v0.3.1`. The upstream project has not endorsed the fork. Maintained packages
+are `packages/fluvie` and `packages/fluvie_mobile_encoder`.
+
+Install the hooks once after cloning with `bash tool/install-hooks.sh`. They
+live in `tool/hooks`. The pre-push hook refuses a push to `main` and requires
+an independent review record for the exact commit. The author cannot record
+that review. The upstream installer under `.githooks/` points `core.hooksPath`
+at `.githooks` and replaces these hooks.
+
+The required check is `bash tool/check.sh` on Flutter 3.47.9. `CI=true melos run gate`,
+including its 97% coverage floor, is the upstream gate. This fork does not claim
+that gate is green. Do not publish to pub.dev from this fork.
+
+Product guides stay in `documentation/`. This fork also keeps
+[`docs/fork-maintenance.md`](docs/fork-maintenance.md) and
+[`docs/reuse.md`](docs/reuse.md). Leave those files in place.
+
 ---
 
 ## Architecture & the layering law
@@ -73,7 +93,7 @@ that is fine — the bar is "it looks right," not "the bytes match."
 - **Unit tests** for everything pure (core, timing, services, math) — the bulk. Mock with **mocktail**; inject fakes through Riverpod overrides. No real network or filesystem in unit tests.
 - **Goldens via Alchemist** (`golden` tag): visual-regression on the Linux baseline. ci goldens (Ahem font) run everywhere; platform goldens (real, bundled fonts) run on Linux only. Fixed fps, fixed seed, DPR 1.0. Regenerate with `flutter test --update-goldens --tags golden`, then review the PNG before committing.
 - **Integration tests** are tagged by what they need: `ffmpeg`, `snapshot` (live Chromium), `wasm`, `render`. Plain `melos run test` excludes goldens/snapshots; CI gates tags per platform.
-- **Coverage gate: ≥97% line coverage** on every package under `packages/` (all eight; generated files excluded, `// coverage:ignore` markers honored), enforced by `melos run coverage:check`; 100% is the goal. Justified `// coverage:ignore` needs a reason on the same line — see `documentation/contributing/coverage.md`.
+- **Coverage.** The upstream gate asks for at least 97% line coverage on every package under `packages/` (all eight; generated files excluded, `// coverage:ignore` markers honored), through `melos run coverage:check`. This fork does not run that check and does not claim it is green. See [`docs/fork-maintenance.md`](docs/fork-maintenance.md). Justified `// coverage:ignore` needs a reason on the same line. See `documentation/contributing/coverage.md`.
 
 ---
 
@@ -100,10 +120,14 @@ that is fine — the bar is "it looks right," not "the bytes match."
 
 ## The quality gate
 
-Run **before every commit**; all must be green (never leave the tree broken):
+For this fork, run `bash tool/check.sh` before every commit that changes the
+maintained packages or the hooks. CI runs that script on Flutter 3.47.9.
+
+The commands below are the upstream workspace gate. They are not the required
+check, and this fork does not claim they are green:
 
 ```sh
-CI=true melos run gate     # = format → analyze → lint → coverage:check
+CI=true melos run gate     # upstream: format → analyze → lint → coverage:check
 # individually (direct runs of filtered scripts need --no-select):
 melos run format           # dart format --set-exit-if-changed
 melos run analyze          # dart analyze --fatal-infos --fatal-warnings
@@ -119,13 +143,13 @@ Run Melos non-interactively (`CI=true`) to avoid the interactive-prompt path.
 ## Commits
 
 - **Conventional Commits**, one logical change per commit, never bundle unrelated changes (`feat(timing): …`, `fix(rendering): …`). The commit-msg hook enforces the format.
-- Install the hooks once after cloning: `bash .githooks/install.sh`.
+- Install the hooks once after cloning: `bash tool/install-hooks.sh`.
 
 ---
 
 ## Documentation & the example lessons
 
-- Human docs live in [`documentation/`](documentation/) (never `docs/`): `getting-started/`, `guides/`, `advanced/`, `reference/`, `contributing/`. **A new capability ships its docs page in the same change.**
+- Human guides live in [`documentation/`](documentation/): `getting-started/`, `guides/`, `advanced/`, `reference/`, `contributing/`. **A new capability ships its guide in the same change.** Fork notes stay in [`docs/fork-maintenance.md`](docs/fork-maintenance.md) and [`docs/reuse.md`](docs/reuse.md).
 - Voice: short sentences, active voice, second person. **No em-dashes.** No marketing vocabulary (seamless, robust, leverage, powerful as filler, effortless, …). Lead with a runnable example. One page answers one question. End every page with `## Where to next`.
 - **Dart snippets are never hand-typed in docs**: they live in compiled, tested files under `examples/gallery/lib/` with `// #docregion` markers and flow into docs fences via `<!-- code-excerpt "<file> (<region>)" -->` directives (checked in CI).
 - The gallery example app is **13 lessons** (`examples/gallery/lib/lessons/01_hello_video.dart` … `13_generative_content.dart`) plus the MVVM inspector. Each lesson: a short intro, one complete readable `Video`, a representative Alchemist golden, and a render-to-file action.
@@ -144,9 +168,13 @@ for the repeatable house patterns (`new-element`, `new-service`, `golden-frame`,
 ## Running locally
 
 ```sh
-melos bootstrap            # resolve the workspace
-CI=true melos run gate     # the full quality gate
-melos run test:goldens     # Alchemist goldens (Linux baseline)
-melos run coverage:check   # the ≥97% coverage gate
-melos run render:examples  # headless lesson renders (needs a Flutter SDK and ffmpeg)
+dart pub get
+dart run melos bootstrap
+bash tool/install-hooks.sh   # fork hooks; required
+bash tool/check.sh            # fork gate on Flutter 3.47.9
 ```
+
+The upstream workspace gate remains `CI=true melos run gate`, including
+`melos run coverage:check`. This fork does not claim that gate is green.
+`melos run test:goldens` and `melos run render:examples` remain upstream
+commands. Goldens need Linux. Render examples need a Flutter SDK and ffmpeg.

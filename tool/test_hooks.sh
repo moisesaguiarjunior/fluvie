@@ -563,6 +563,53 @@ else
   failures=$((failures + 1))
 fi
 
+contrib="$src/../CONTRIBUTING.md"
+overview="$src/../documentation/contributing/overview.md"
+reuse="$src/../docs/reuse.md"
+fluvie_pubspec="$src/../packages/fluvie/pubspec.yaml"
+encoder_pubspec="$src/../packages/fluvie_mobile_encoder/pubspec.yaml"
+if grep -q 'git clone https://github.com/moisesaguiarjunior/fluvie.git' "$contrib" \
+  && grep -q 'git clone https://github.com/moisesaguiarjunior/fluvie.git' "$overview" \
+  && grep -q 'bash tool/install-hooks.sh' "$overview" \
+  && ! grep -q 'bash .githooks/install.sh' "$overview" \
+  && ! grep -q 'git clone https://github.com/SimonErich/fluvie.git' "$contrib" \
+  && ! grep -q 'git clone https://github.com/SimonErich/fluvie.git' "$overview" \
+  && grep -q 'OffscreenCaptureHost' "$reuse" \
+  && grep -q 'bash tool/check.sh' "$reuse" \
+  && grep -q 'issue_tracker: https://github.com/moisesaguiarjunior/fluvie/issues' "$fluvie_pubspec" \
+  && grep -q 'issue_tracker: https://github.com/moisesaguiarjunior/fluvie/issues' "$encoder_pubspec"; then
+  echo "ok   fork setup clones this repository and maintained packages report issues here"
+else
+  echo "FAIL fork setup still sends contributors or issues to the upstream clone"
+  failures=$((failures + 1))
+fi
+
+claude="$src/../CLAUDE.md"
+if grep -q 'bash tool/install-hooks.sh' "$claude" \
+  && grep -q 'bash tool/check.sh' "$claude" \
+  && grep -q 'docs/fork-maintenance.md' "$claude" \
+  && grep -q 'docs/reuse.md' "$claude" \
+  && ! grep -q 'bash .githooks/install.sh' "$claude" \
+  && ! grep -q 'never `docs/`' "$claude"; then
+  echo "ok   CLAUDE.md installs fork hooks and keeps the fork notes"
+else
+  echo "FAIL CLAUDE.md still installs upstream hooks or hides the fork notes"
+  failures=$((failures + 1))
+fi
+
+community="$(awk '
+  /^## Community/ { in_section=1; next }
+  in_section && /^## / { exit }
+  in_section { print }
+' "$readme")"
+if printf '%s\n' "$community" | grep -q 'https://github.com/moisesaguiarjunior/fluvie/issues' \
+  && ! printf '%s\n' "$community" | grep -q 'https://github.com/SimonErich/fluvie/issues'; then
+  echo "ok   README community issues point at this fork"
+else
+  echo "FAIL README community issues still point at the upstream repository"
+  failures=$((failures + 1))
+fi
+
 security="$src/../SECURITY.md"
 report="$(awk '
   /^## Reporting a vulnerability/ { in_section=1; next }

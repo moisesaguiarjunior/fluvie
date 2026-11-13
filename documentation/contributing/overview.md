@@ -1,29 +1,26 @@
 # Contributing overview
 
-This page is the workflow: how a change moves from a failing test to a merged
-commit. The rule that gates everything is one command. Run it before you commit:
-
-```sh
-CI=true melos run gate
-```
-
-The gate runs format, analyze, lint, and the coverage check. All four must be
-green. Never leave the tree broken. The rest of this page explains each step and
-the rules around it.
+This fork's required check is `bash tool/check.sh` on Flutter 3.47.9. Install
+`tool/hooks` with `bash tool/install-hooks.sh`. Clone
+`https://github.com/moisesaguiarjunior/fluvie.git`. Do not commit to `main`.
+The upstream command `CI=true melos run gate`, including its 97% coverage
+floor, is not this fork's gate and is not claimed green. The sections below
+keep the upstream workflow for the packages this fork does not maintain.
 
 ## Set up the workspace
 
-Clone the repo and resolve the workspace, then install the hooks:
+Clone this fork and resolve the workspace, then install the fork hooks:
 
 ```sh
-git clone https://github.com/SimonErich/fluvie.git && cd fluvie
+git clone https://github.com/moisesaguiarjunior/fluvie.git && cd fluvie
 dart pub get                  # resolves the workspace root
 melos bootstrap               # resolves all packages
-bash .githooks/install.sh     # installs the git hooks (required)
+bash tool/install-hooks.sh    # fork hooks (required)
 ```
 
-You need Flutter 3.44+, Dart 3.12+, and `ffmpeg` on your PATH for the
-render-integration tests.
+You need Flutter 3.47.9 for the fork gate. Upstream documented Flutter 3.44+
+and Dart 3.12+. `ffmpeg` on your PATH is still required for the
+render-integration tests, which are outside the default fork gate.
 
 ## Test first, always
 
