@@ -12,6 +12,9 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
+import 'support/file_project.dart';
+import 'support/native_animation_composition.dart';
+
 const String _outPath = '/tmp/fluvie_demo_test/demo.mp4';
 const String _multiScenePath = '/tmp/fluvie_demo_test/multi_scene.mp4';
 const String _lesson04Path = '/tmp/fluvie_demo_test/04_scenes_and_transitions.mp4';
@@ -39,126 +42,6 @@ Video build() => Video(
   ],
 );
 ''';
-
-// A native Flutter ticker, with its elapsed microseconds painted as a binary
-// strip so the encoded frames expose timing errors smaller than one pixel.
-const String _nativeAnimationComposition = '''
-import 'package:flutter/material.dart' hide Animation, Clip, Image, Tween;
-import 'package:fluvie/fluvie.dart';
-
-Video build() => Video(
-  width: 96,
-  height: 64,
-  fps: 29,
-  scenes: [
-    Scene(
-      duration: Time.frames(30),
-      children: const [NativeClock()],
-    ),
-  ],
-);
-
-class NativeClock extends StatefulWidget {
-  const NativeClock({super.key});
-
-  @override
-  State<NativeClock> createState() => _NativeClockState();
-}
-
-class _NativeClockState extends State<NativeClock>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _controller,
-    builder: (context, child) => SizedBox(
-      width: 96,
-      height: 64,
-      child: CustomPaint(
-        painter: _ClockPainter(
-          _controller.value,
-          _controller.lastElapsedDuration?.inMicroseconds ?? 0,
-        ),
-      ),
-    ),
-  );
-}
-
-class _ClockPainter extends CustomPainter {
-  const _ClockPainter(this.value, this.elapsed);
-
-  final double value;
-  final int elapsed;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final level = (value * 255).round();
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = Color.fromARGB(255, level, level, level),
-    );
-    for (var bit = 0; bit < 24; bit++) {
-      canvas.drawRect(
-        Rect.fromLTWH(bit * 4.0, 32, 4, 32),
-        Paint()..color = (elapsed & (1 << bit)) == 0
-            ? Colors.black
-            : Colors.white,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ClockPainter oldDelegate) => elapsed != oldDelegate.elapsed;
-}
-''';
-
-Future<void> _prepareFileProject(Directory project, String composition) async {
-  project.createSync(recursive: true);
-  File('${project.path}/pubspec.yaml').writeAsStringSync('''
-name: e2e_clip
-publish_to: none
-version: 1.0.0
-
-environment:
-  sdk: ^3.12.0
-
-dependencies:
-  flutter:
-    sdk: flutter
-  fluvie:
-    path: ${Directory.current.parent.path}/fluvie
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  alchemist: ^0.14.0
-''');
-  File('${project.path}/lib/example_video.dart')
-    ..createSync(recursive: true)
-    ..writeAsStringSync(composition);
-
-  final got = await Process.run('flutter', const [
-    'pub',
-    'get',
-  ], workingDirectory: project.path);
-  expect(got.exitCode, 0, reason: '${got.stdout}\n${got.stderr}');
-}
 
 Future<ProcessResult> _renderKey(String key, String outPath, List<String> extra) =>
     Process.run('dart', [
@@ -227,7 +110,7 @@ void main() {
     // assets/ folder and a pubspec. There is no registry, no committed harness
     // and no app. The CLI stages a harness that statically imports the
     // composition and drives the same capture the keyed path does.
-    await _prepareFileProject(Directory(_fileTargetProject), _fileComposition);
+    await prepareFileProject(Directory(_fileTargetProject), _fileComposition);
 
     const outPath = '$_fileTargetProject/clip.mp4';
     final result = await _renderFile(
@@ -264,7 +147,7 @@ void main() {
   test('native Flutter animation follows exact 29fps CLI timestamps', () async {
     final project = Directory.systemTemp.createTempSync('fluvie_native_clock_');
     addTearDown(() => project.deleteSync(recursive: true));
-    await _prepareFileProject(project, _nativeAnimationComposition);
+    await prepareFileProject(project, nativeAnimationComposition);
     final outPath = '${project.path}/native_clock.mp4';
     final result = await _renderFile(
       '${project.path}/lib/example_video.dart',

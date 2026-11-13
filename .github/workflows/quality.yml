@@ -53,12 +53,10 @@ jobs:
           cache: true
       - name: Install development encoder
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: CLI format, analysis and default tests
-        run: |
-          flutter pub get --enforce-lockfile
-          dart format --output=none --set-exit-if-changed lib test
-          dart analyze --fatal-infos
-          dart test --exclude-tags 'ffmpeg || download || render || analysis || generative'
+      # CLI format, analysis, raw-frame timing and default tests are in the
+      # required Repository checks job through maintained-packages.txt.
+      - name: Resolve capture dependencies
+        run: flutter pub get --enforce-lockfile
       - name: Decode and verify native animation timing
         env:
           FLUVIE_FFMPEG: ffmpeg

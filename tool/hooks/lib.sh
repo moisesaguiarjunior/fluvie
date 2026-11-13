@@ -15,8 +15,18 @@ check_package() {
     # Flutter derives its own version through git, so they must not leak.
     clear_git_environment
     cd "$pkg" || exit 1
-    "$runner" pub get --offline --enforce-lockfile >/dev/null 2>&1 ||
-      "$runner" pub get --enforce-lockfile >/dev/null || exit 1
+    # Even a pure-Dart child resolves the fork's Flutter workspace. Keep
+    # dependency resolution separate from its analyzer and test runner.
+    local pub_runner="$runner" workspace_dir="$PWD"
+    while [ "$workspace_dir" != / ]; do
+      if [ -f "$workspace_dir/pubspec.yaml" ] && grep -q '^workspace:' "$workspace_dir/pubspec.yaml"; then
+        pub_runner=flutter
+        break
+      fi
+      workspace_dir="$(dirname "$workspace_dir")"
+    done
+    "$pub_runner" pub get --offline --enforce-lockfile >/dev/null 2>&1 ||
+      "$pub_runner" pub get --enforce-lockfile >/dev/null || exit 1
     dart format --output=none --set-exit-if-changed . || exit 1
     "$runner" analyze --fatal-infos || exit 1
     if [ -d test ]; then

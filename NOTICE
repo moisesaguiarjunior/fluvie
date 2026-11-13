@@ -9,8 +9,8 @@ License: MIT (see LICENSE)
 
 The upstream project has not endorsed this fork.
 
-Maintained packages are packages/fluvie and packages/fluvie_mobile_encoder
-at 0.3.1+socialstudio.2. This fork is not published. The capture corrections
+Maintained packages are packages/fluvie, packages/fluvie_mobile_encoder,
+and packages/fluvie_cli at 0.3.1+socialstudio.2. This fork is not published. The capture corrections
 are in this tree: render and renderToSandbox prepare captions, and the
 offscreen host resolves motion without an application frame. The CLI capture harness also advances native animation time. Other workspace
 packages stay as upstream published them at v0.3.1.
@@ -45,3 +45,8 @@ Native animation capture, recorded 2026-11-13:
 - The CLI capture harness advances rounded absolute-time deltas instead
   of pumping with zero elapsed time, without requiring a new SDK API.
 - The native CLI export check decodes an actual encoded video at 29 fps.
+
+The required package gate includes the CLI. Its default native-capture test
+executes the generated harness and reads raw frame timestamps without
+FFmpeg. The optional encoded-export test reuses the same synthetic fixture.
+Coverage remains scoped to the two core SDK packages.

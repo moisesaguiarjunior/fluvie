@@ -24,7 +24,8 @@ not pushed. The pre-push hook refuses a push to `main`.
 
 The fork's required check is `bash tool/check.sh` (hook regressions, the
 upstream hook self-test, format, strict analysis, and the default tests for
-`packages/fluvie` and `packages/fluvie_mobile_encoder`). CI runs that script
+`packages/fluvie`, `packages/fluvie_mobile_encoder`, and
+`packages/fluvie_cli`). CI runs that script
 on Flutter 3.47.9. See the quality workflow. Reusable entry points are
 listed in [docs/reuse.md](docs/reuse.md).
 
@@ -44,7 +45,8 @@ bash tool/install-hooks.sh         # fork hooks (required)
 
 You need Flutter 3.47.9 for the fork gate. Upstream documented Flutter 3.44+
 and Dart 3.12+. `ffmpeg` is still required for the render-integration tests,
-which are outside the default fork gate.
+which are outside the default fork gate. Native ticker timing is checked
+by a default CLI test that captures raw frames without FFmpeg.
 
 ## The rules that get PRs merged
 

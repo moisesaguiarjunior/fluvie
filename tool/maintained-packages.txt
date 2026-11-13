@@ -3,3 +3,4 @@
 # v0.3.1. A commit that touches one of them is still checked by the hooks.
 packages/fluvie
 packages/fluvie_mobile_encoder
+packages/fluvie_cli
