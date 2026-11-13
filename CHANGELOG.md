@@ -13,7 +13,9 @@ Fork pre-release of the maintained packages only. Not published.
 corrections. Other packages stay at upstream 0.3.1. The package changelogs
 list what was not verified. Contributor setup clones this fork. The
 maintained packages' issue trackers point here. The Flutter 3.44.0
-workspace analyze is no longer a workflow job. Agent instructions install `tool/hooks`
+workspace analyze is no longer a workflow job. The root README header
+badges name this pre-release, this repository's quality workflow, and
+this repository's Codecov page. Agent instructions install `tool/hooks`
 and send fork issues to this repository.
 
 ## [0.3.0] - 2026-07-15

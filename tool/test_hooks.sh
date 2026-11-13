@@ -563,6 +563,30 @@ else
   failures=$((failures + 1))
 fi
 
+fluvie_version="$(awk '/^version:/ { print $2; exit }' "$src/../packages/fluvie/pubspec.yaml")"
+fluvie_version_badge="$(printf '%s' "$fluvie_version" | sed 's/+/%2B/g')"
+badges="$(awk '
+  /<p align="center">/ { blocks++ }
+  blocks == 3 { print }
+  blocks == 3 && /<\/p>/ { exit }
+' "$readme")"
+if printf '%s\n' "$badges" | grep -q "badge/pub-${fluvie_version_badge}-blue" \
+  && printf '%s\n' "$badges" | grep -q 'https://github.com/moisesaguiarjunior/fluvie/actions/workflows/quality.yml/badge.svg' \
+  && printf '%s\n' "$badges" | grep -q 'https://codecov.io/gh/moisesaguiarjunior/fluvie/graph/badge.svg' \
+  && printf '%s\n' "$badges" | grep -q 'license-MIT' \
+  && ! printf '%s\n' "$badges" | grep -q 'maintained%20with-melos' \
+  && ! printf '%s\n' "$badges" | grep -q 'melos.invertase.dev' \
+  && ! printf '%s\n' "$badges" | grep -q 'SimonErich/fluvie/actions' \
+  && ! printf '%s\n' "$badges" | grep -q 'img.shields.io/pub/v/' \
+  && ! printf '%s\n' "$badges" | grep -q 'codecov.io/gh/SimonErich' \
+  && grep -q 'uploads no coverage report' "$readme" \
+  && ! grep -q 'badges describe the upstream project' "$readme"; then
+  echo "ok   README badges point at this fork and keep the MIT license"
+else
+  echo "FAIL README badges still describe upstream CI, pub.dev, Codecov, or melos"
+  failures=$((failures + 1))
+fi
+
 contrib="$src/../CONTRIBUTING.md"
 overview="$src/../documentation/contributing/overview.md"
 reuse="$src/../docs/reuse.md"

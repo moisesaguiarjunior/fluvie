@@ -174,7 +174,11 @@ Not verified:
 Tag pushes of `publish.yml` and `images.yml` fail closed. Docs and website
 deploys do not run on push. Git history of `v0.3.1` still has the original
 workflows. This fork is not published to pub.dev. A later publication needs
-a new package name and a maintainer decision.
+a new package name and a maintainer decision. The root README header
+names this pre-release, links this repository's quality workflow, and
+links this repository's Codecov page. On 2026-11-13 the Codecov badge
+SVG read `unknown`. The MIT license badge stays in that header. The
+maintained-with-melos badge is absent from it.
 
 ## Ruleset
 
