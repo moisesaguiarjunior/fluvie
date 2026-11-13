@@ -439,6 +439,23 @@ expect pass "Dart default checks exclude opt-in toolchain and download suites" $
 DEFAULT_TEST_FAIL=1 PATH="$work/dart-default/bin:$PATH" check_package "$work/dart-default/pkg" >/dev/null 2>&1
 expect reject "Dart default checks still reject a failing normal test" $?
 
+# A pure-Dart child still resolves the fork's Flutter workspace, but its
+# analyzer/default tests must stay on the Dart VM.
+mkdir -p "$work/flutter-workspace/bin" "$work/flutter-workspace/cli/test"
+printf 'name: workspace_probe\nworkspace:\n  - cli\n' >"$work/flutter-workspace/pubspec.yaml"
+printf 'name: cli_probe\nresolution: workspace\n' >"$work/flutter-workspace/cli/pubspec.yaml"
+cat >"$work/flutter-workspace/bin/flutter" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" = pub ] || exit 43
+STUB
+cat >"$work/flutter-workspace/bin/dart" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" != pub ] || exit 44
+STUB
+chmod +x "$work/flutter-workspace/bin/flutter" "$work/flutter-workspace/bin/dart"
+PATH="$work/flutter-workspace/bin:$PATH" check_package "$work/flutter-workspace/cli" >/dev/null 2>&1
+expect pass "a Dart workspace child resolves with Flutter and tests with Dart" $?
+
 # Upstream grep gate. A staged TODO must fail while .githooks is present.
 mkdir -p .githooks
 cat >.githooks/_lib.sh <<'LIB'
@@ -607,6 +624,15 @@ else
   failures=$((failures + 1))
 fi
 
+# Native CLI capture is required even when the optional encoder job is not.
+if grep -qx 'packages/fluvie_cli' "$src/maintained-packages.txt" \
+  && [ -f "$src/../packages/fluvie_cli/test/native_capture_harness_test.dart" ]; then
+  echo "ok   required package checks include CLI native capture"
+else
+  echo "FAIL required package checks lost CLI native capture"
+  failures=$((failures + 1))
+fi
+
 coverage_workflow="$src/../.github/workflows/coverage.yml"
 coverage_script="$src/../tool/coverage.sh"
 if grep -q "flutter-version: '3.47.9'" "$coverage_workflow" \
@@ -617,7 +643,7 @@ if grep -q "flutter-version: '3.47.9'" "$coverage_workflow" \
   && grep -q 'packages/fluvie_mobile_encoder' "$coverage_script" \
   && ! grep -q 'melos run coverage:check' "$coverage_workflow" \
   && ! grep -q -- '--min 97' "$coverage_workflow"; then
-  echo "ok   coverage workflow measures the two maintained packages"
+  echo "ok   coverage workflow measures the two core packages"
 else
   echo "FAIL coverage workflow is missing the maintained-package report"
   failures=$((failures + 1))

@@ -11,7 +11,9 @@ You describe **what** the video is; Fluvie computes **when** everything happens.
 
 This working agreement applies to the fork of SimonErich/fluvie at tag
 `v0.3.1`. The upstream project has not endorsed the fork. Maintained packages
-are `packages/fluvie` and `packages/fluvie_mobile_encoder`.
+are `packages/fluvie`, `packages/fluvie_mobile_encoder`, and
+`packages/fluvie_cli`. The CLI default suite captures the generated harness
+without FFmpeg and verifies native ticker timing.
 
 Install the hooks once after cloning with `bash tool/install-hooks.sh`. They
 live in `tool/hooks`. The pre-push hook refuses a push to `main` and requires

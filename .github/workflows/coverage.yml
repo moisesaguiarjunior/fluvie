@@ -1,6 +1,6 @@
 name: Coverage
 
-# Line coverage for the two packages this fork maintains. This is not the
+# Line coverage for the two core SDK packages, excluding the CLI. This is not the
 # required check, and it is not the upstream 97% workspace gate.
 on:
   pull_request:

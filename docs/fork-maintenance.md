@@ -281,9 +281,8 @@ then generates and decodes an actual H.264 video at 29 fps. The fixture
 paints ticker elapsed microseconds as a binary strip, verifying exact
 rounding as well as visible animation. FFmpeg is a development subprocess,
 not a newly bundled runtime dependency. The two maintained core packages
-remain the scope of the informational coverage workflow. The CLI capture
-harness has this additional quality check; unrelated CLI features are not
-claimed as maintained by the fork.
+remain the scope of the informational coverage workflow. The CLI is also included in the required package gate; this encoded-export
+job is supplementary.
 
 Pure-Dart package checks follow the upstream Dart exclusions (`ffmpeg`,
 `download`, `render`, `analysis`, `generative`) and run under `dart test`,
@@ -291,3 +290,27 @@ not `flutter test`. The CLI's process-runner tests need the Dart VM's
 `Platform.resolvedExecutable`. Integration tests are run explicitly in
 the dedicated export job instead of running provisioning downloads during
 ordinary commits.
+
+## Required native timing regression
+
+`packages/fluvie_cli` is in `tool/maintained-packages.txt`, so the required
+Repository checks job runs its format, strict analysis and default tests.
+The default CLI suite now includes `native_capture_harness_test.dart`. It
+builds the actual generated harness in a disposable project and captures
+30 frames at 29 FPS without invoking FFmpeg. The ticker's elapsed time is
+read from the fixture's binary pixel strip, including frame zero and exact
+fractional-frame rounding.
+
+Merely including the earlier 450 CLI tests would not protect the timing
+fix. Removing the elapsed-time pump or accumulating rounded intervals makes
+the new default suite fail. A hook regression also rejects removing the
+CLI from the maintained list or deleting this default test. No GitHub
+ruleset change is needed. The separate Native animation export job still
+checks the encoded result using the same fixture and project helper.
+Coverage remains scoped to the two core SDK packages and excludes the CLI.
+
+The package checker resolves a workspace with `flutter pub`, including when
+only its pure-Dart CLI child is checked in a fresh staged snapshot. Analysis
+and default CLI tests still use Dart. A workspace regression rejects using
+the Dart resolver there or using Flutter as the CLI test runner. This avoids
+relying on another package having bootstrapped the checkout first.

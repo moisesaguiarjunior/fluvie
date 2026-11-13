@@ -9,6 +9,10 @@ Fork pre-release. Not published to pub.dev.
 
 ### Fixed
 
+- Make native capture timing a default, FFmpeg-free generated-harness
+  regression, and include the CLI in the required package gate. Share the
+  synthetic ticker and project fixture with the encoded-video test.
+
 - Advance the generated capture harness at the video's frame rate using
   rounded absolute timestamps, without requiring new SDK APIs. Native Flutter animations advance without cumulative rounding
   drift. The composition is constructed once per render.

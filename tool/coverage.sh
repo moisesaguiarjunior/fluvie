@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Line coverage for the two packages this fork maintains.
+# Line coverage for the two core SDK packages, excluding the CLI.
 #
 # Uses the same exclusions as tool/check.sh. Golden, snapshot, ffmpeg, wasm,
 # render, and generative tests stay out. This is not the upstream 97%
