@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1+socialstudio.2] - 2026-11-13
+
+Fork pre-release. Not published to pub.dev.
+
+### Fixed
+
+- Advance every frame through the widget tree even on cache hits, preserving
+  native animation state in cold, warm and partially cached renders.
+- Invalidate frame caches from earlier capture behavior.
+
 ## [Unreleased]
 
 ## [0.3.1+socialstudio.1] - 2026-11-12

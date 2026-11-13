@@ -106,7 +106,7 @@ final class PreviewCommand {
         workingDirectory: appDir,
         mode: ProcessStartMode.inheritStdio,
       );
-      return process.exitCode;
+      return await process.exitCode;
     } on CliFailure catch (failure) {
       err.writeln(failure.message);
       return 1;

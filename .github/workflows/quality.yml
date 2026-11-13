@@ -34,3 +34,32 @@ jobs:
           python-version: '3.12'
       - name: Hook regressions and maintained package checks
         run: bash tool/check.sh
+
+  native-export:
+    name: Native animation export
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/fluvie_cli
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Install development encoder
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: CLI format, analysis and default tests
+        run: |
+          flutter pub get --enforce-lockfile
+          dart format --output=none --set-exit-if-changed lib test
+          dart analyze --fatal-infos
+          dart test --exclude-tags 'ffmpeg || download || render || analysis || generative'
+      - name: Decode and verify native animation timing
+        env:
+          FLUVIE_FFMPEG: ffmpeg
+        run: dart test --tags ffmpeg test/render_e2e_test.dart --plain-name 'native Flutter animation follows exact 29fps CLI timestamps'

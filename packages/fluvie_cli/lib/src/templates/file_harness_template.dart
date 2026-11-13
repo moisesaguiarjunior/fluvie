@@ -61,9 +61,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final progressFile = Platform.environment['FLUVIE_PROGRESS_FILE'];
+    final video = target.$entry();
+    var frame = 0;
+    var previousTimestamp = 0;
 
     await renderVideo(
-      video: target.$entry(),
+      video: video,
       outDir: Directory(_outDir),
       compositionKey: _key.isEmpty ? 'render' : _key,
       frameCountOverride: _frames.isEmpty ? null : int.parse(_frames),
@@ -78,7 +81,13 @@ void main() {
         tester.view.devicePixelRatio = 1.0;
       },
       pumpWidget: tester.pumpWidget,
-      pumpFrame: () => tester.pump(),
+      pumpFrame: () async {
+        // Round absolute times, not each interval, to avoid accumulated drift.
+        final timestamp = (frame * Duration.microsecondsPerSecond / video.fps).round();
+        await tester.pump(Duration(microseconds: timestamp - previousTimestamp));
+        previousTimestamp = timestamp;
+        frame++;
+      },
       runAsync: tester.runAsync,
       onProgress: progressFile == null || progressFile.isEmpty
           ? null

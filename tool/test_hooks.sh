@@ -421,6 +421,24 @@ expect reject "pre-push still checks an unmaintained package in the commit" $?
 git reset -q --hard "$tip"
 rm -rf zzz
 
+# Pure-Dart default checks exclude opt-in suites but still run normal tests.
+mkdir -p "$work/dart-default/bin" "$work/dart-default/pkg/test"
+printf 'name: dart_default_probe\n' >"$work/dart-default/pkg/pubspec.yaml"
+cat >"$work/dart-default/bin/dart" <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = test ]; then
+  [ "${2:-}" = --exclude-tags ] || exit 41
+  [ "${3:-}" = 'ffmpeg || download || render || analysis || generative' ] || exit 41
+  [ "${DEFAULT_TEST_FAIL:-0}" = 0 ] || exit 42
+fi
+exit 0
+STUB
+chmod +x "$work/dart-default/bin/dart"
+PATH="$work/dart-default/bin:$PATH" check_package "$work/dart-default/pkg" >/dev/null 2>&1
+expect pass "Dart default checks exclude opt-in toolchain and download suites" $?
+DEFAULT_TEST_FAIL=1 PATH="$work/dart-default/bin:$PATH" check_package "$work/dart-default/pkg" >/dev/null 2>&1
+expect reject "Dart default checks still reject a failing normal test" $?
+
 # Upstream grep gate. A staged TODO must fail while .githooks is present.
 mkdir -p .githooks
 cat >.githooks/_lib.sh <<'LIB'

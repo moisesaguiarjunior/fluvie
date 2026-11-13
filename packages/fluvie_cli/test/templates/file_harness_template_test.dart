@@ -20,13 +20,15 @@ void main() {
     test('calls the default build entry', () {
       final source = fileHarnessSource(targetImport: 'input.dart');
 
-      expect(source, contains('video: target.build(),'));
+      expect(source, contains('final video = target.build();'));
+      expect(source, contains('video: video,'));
     });
 
     test('calls a custom entry', () {
       final source = fileHarnessSource(targetImport: 'input.dart', entry: 'introClipVideo');
 
-      expect(source, contains('video: target.introClipVideo(),'));
+      expect(source, contains('final video = target.introClipVideo();'));
+      expect(source, contains('video: video,'));
       expect(source, isNot(contains('target.build()')));
     });
 

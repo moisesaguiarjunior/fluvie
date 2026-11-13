@@ -6,6 +6,14 @@ All notable changes to the Fluvie workspace. The format follows
 
 Per-package changelogs live next to each package.
 
+## [0.3.1+socialstudio.2] - 2026-11-13
+
+Cache hits advance widget state. The CLI capture host advances native
+animations at the video frame rate without adding a new SDK requirement.
+A dedicated quality job decodes the 29 fps native-animation export. The
+upstream contribution and remaining limits are recorded in NOTICE and
+docs/fork-maintenance.md. Not published to pub.dev.
+
 ## [0.3.1+socialstudio.1] - 2026-11-12
 
 Fork pre-release of the maintained packages only. Not published.

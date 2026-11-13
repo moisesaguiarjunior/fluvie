@@ -405,7 +405,7 @@ dependencies:
         '${project.path}/.fluvie/example_video_dart/harness_test.dart',
       ).readAsStringSync();
       expect(harness, contains("import '../../example_video.dart' as target;"));
-      expect(harness, contains('video: target.build(),'));
+      expect(harness, contains('final video = target.build();'));
     });
 
     test('the staged harness survives the render, so the kernel cache hits again', () async {
@@ -441,7 +441,7 @@ dependencies:
 
       expect(
         File('${project.path}/.fluvie/example_video_dart/harness_test.dart').readAsStringSync(),
-        contains('video: target.introClipVideo(),'),
+        contains('final video = target.introClipVideo();'),
       );
     });
 

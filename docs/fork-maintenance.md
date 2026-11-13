@@ -247,3 +247,47 @@ the published `890543e`.
 
 `tool/test_hooks.sh` is the regression suite. It builds its own schema
 fixture. It does not copy another project's spec.
+
+## Native animation capture (0.3.1+socialstudio.2)
+
+Adapted from [upstream PR #2](https://github.com/SimonErich/fluvie/pull/2),
+commit `442aab61c1ab0120bc54a41337eb26985ee09458`, by Dmitry Dolgopyatov.
+The fork preserves its caption-preparation and offscreen-host changes.
+
+The frame loop pumps every requested frame before looking up its pixels.
+Cache hits still avoid pixel capture, but no longer skip widget-tree
+updates or native ticker evolution. This changes the cost of a fully warm
+render; cache acceleration has not been benchmarked. The fork version and
+render digest change together so old cached frames are not reused.
+
+The generated CLI harness constructs the video once and advances
+`tester.pump` by differences between rounded absolute frame timestamps.
+Frame zero advances by zero. The callback remains self-contained: it
+compiles in the target project, which may depend on the published SDK
+rather than this fork. Requiring a new SDK timing API would break that
+boundary. No public clock abstraction is added for a speculative caller.
+The CLI scaffold keeps published base dependency versions, stripping fork
+build metadata in the release-pin regression.
+
+This is sequential capture from frame zero. It does not promise seek,
+rewind, reconstruction of stateful tickers at an arbitrary starting frame,
+or parity between different rendering platforms. Existing custom hosts
+that pump zero elapsed time must advance their host clock; updating Fluvie alone
+does not rewrite a consumer's callback. The Social Studio capture host
+needs that integration when it pins this reviewed fork version.
+
+The dedicated Native animation export job checks the CLI on Flutter 3.47.9,
+then generates and decodes an actual H.264 video at 29 fps. The fixture
+paints ticker elapsed microseconds as a binary strip, verifying exact
+rounding as well as visible animation. FFmpeg is a development subprocess,
+not a newly bundled runtime dependency. The two maintained core packages
+remain the scope of the informational coverage workflow. The CLI capture
+harness has this additional quality check; unrelated CLI features are not
+claimed as maintained by the fork.
+
+Pure-Dart package checks follow the upstream Dart exclusions (`ffmpeg`,
+`download`, `render`, `analysis`, `generative`) and run under `dart test`,
+not `flutter test`. The CLI's process-runner tests need the Dart VM's
+`Platform.resolvedExecutable`. Integration tests are run explicitly in
+the dedicated export job instead of running provisioning downloads during
+ordinary commits.
