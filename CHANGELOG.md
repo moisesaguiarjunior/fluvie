@@ -17,7 +17,8 @@ workspace analyze is no longer a workflow job. The root README header
 badges name this pre-release, this repository's quality workflow, and
 this repository's Codecov page. Agent instructions install `tool/hooks`
 and send fork issues to this repository. The 3.44 analyze note separates
-the pin conflict from `cascade_invocations`.
+the pin conflict from `cascade_invocations`. The coverage workflow uploads
+line coverage for the two maintained packages.
 
 ## [0.3.0] - 2026-07-15
 

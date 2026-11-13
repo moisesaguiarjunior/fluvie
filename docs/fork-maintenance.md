@@ -137,6 +137,32 @@ in `.github/workflows/quality.yml` on Flutter 3.47.9. The other fourteen jobs in
 `ffmpeg_integration` and `example_mobile_render`. This commit does not
 re-run them and does not claim the historical coverage failure is fixed.
 
+## Maintained package coverage
+
+`bash tool/coverage.sh` measures `packages/fluvie` and
+`packages/fluvie_mobile_encoder` on Flutter 3.47.9. It uses the same
+exclusions as `bash tool/check.sh`: `golden`, `snapshot`, `ffmpeg`, `wasm`,
+`render`, and `generative`. It writes `coverage/lcov.info` with paths
+relative to the repository root. That file is gitignored.
+
+Measured on 2026-11-12, after 3326 `fluvie` tests and 83 encoder tests:
+
+- `packages/fluvie`: 97.35% (8911/9154)
+- `packages/fluvie_mobile_encoder`: 98.61% (213/216)
+
+`dart tool/check_coverage.dart` produced those line totals and honors
+`// coverage:ignore`. The library and test trees match commit `4cc92c5`.
+This is not the upstream 97% workspace gate. That gate covers every
+package and was not re-run.
+
+`.github/workflows/coverage.yml` uploads `coverage/lcov.info` on pull
+requests and on manual dispatch. It is not the required check. The upload
+step reads `secrets.CODECOV_TOKEN`. On 2026-11-12 Codecov refused a direct
+upload for `feat/capture-corrections` with `Token required - not valid
+tokenless upload`. On 2026-11-13 the repository has a `CODECOV_TOKEN`
+Actions secret. This workflow file is not on GitHub yet, and Codecov has
+not accepted a report, so the badge stays without a percentage.
+
 ## Capture corrections
 
 Recorded 2026-11-12, on top of the repository gates. The maintained
