@@ -26,7 +26,9 @@ check_package() {
         # tests belong to their own jobs. The default suite still runs.
         "$runner" test --exclude-tags "golden || snapshot || ffmpeg || wasm || render || generative" || exit 1
       else
-        "$runner" test || exit 1
+        # Match upstream's pure-Dart gate. Download and toolchain integration
+        # suites are opt-in, not part of a local default-package check.
+        "$runner" test --exclude-tags "ffmpeg || download || render || analysis || generative" || exit 1
       fi
     fi
   ) </dev/null

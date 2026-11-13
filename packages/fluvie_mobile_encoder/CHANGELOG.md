@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1+socialstudio.2] - 2026-11-13
+
+Fork pre-release. Not published to pub.dev.
+
+### Changed
+
+- Align the fork version with the shared frame-cache correction. Cached frames
+  now advance widget state before reusing their pixels. No mobile timing,
+  release or performance verification is claimed by this version.
+
 ## [0.3.1+socialstudio.1] - 2026-11-12
 
 Fork pre-release. Not published to pub.dev.

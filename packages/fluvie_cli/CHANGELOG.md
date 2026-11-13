@@ -3,6 +3,18 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.1+socialstudio.2] - 2026-11-13
+
+Fork pre-release. Not published to pub.dev.
+
+### Fixed
+
+- Advance the generated capture harness at the video's frame rate using
+  rounded absolute timestamps, without requiring new SDK APIs. Native Flutter animations advance without cumulative rounding
+  drift. The composition is constructed once per render.
+- Await the preview subprocess inside its error-handling block, as required
+  by the fork's Flutter 3.47.9 analyzer.
+
 ## [0.3.1] - 2026-07-16
 
 Lockstep release with the rest of the Fluvie workspace.
