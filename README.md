@@ -339,3 +339,5 @@ these hooks. The upstream workspace gate stays documented in
 ## License
 
 [MIT](LICENSE) © 2026 Simon Auer.
+
+External material adapters: [declared media and frame ownership](docs/external-materials.md).
