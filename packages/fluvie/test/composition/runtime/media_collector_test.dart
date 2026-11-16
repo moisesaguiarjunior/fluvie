@@ -6,6 +6,7 @@
 
 import 'package:flutter/widgets.dart' hide Animation, Clip, Image, Tween;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluvie/fluvie.dart' show CollectibleChildren, FrameBuilder;
 import 'package:fluvie/src/animation/animate_extension.dart';
 import 'package:fluvie/src/composition/background/background.dart';
 import 'package:fluvie/src/composition/box.dart';
@@ -34,6 +35,26 @@ Scene _scene({Background? background, List<Widget> children = const []}) =>
 
 void main() {
   group('collectMediaSources (WI-6, D3)', () {
+    test('external stateful material wrappers expose declared media without building', () {
+      final media = Image.asset('fixtures/swatch.png').animate(const []);
+      final wrapper = _ExternalMaterialSurface(
+        child: Stack(
+          children: [
+            Padding(padding: EdgeInsets.zero, child: media),
+            FrameBuilder(
+              (_) => throw StateError('Do not build decorative frame callbacks during collection'),
+            ),
+          ],
+        ),
+      );
+      expect(
+        collectMediaSources([
+          _scene(children: [wrapper]),
+        ]),
+        {_logo},
+      );
+    });
+
     test('a media-less tree yields the empty set', () {
       final scenes = [
         _scene(
@@ -333,4 +354,20 @@ void main() {
       expect(collectSnapshots(scenes), isEmpty);
     });
   });
+}
+
+// Consumer-owned material surfaces can retain Fluvie media/timing ownership.
+class _ExternalMaterialSurface extends StatefulWidget implements CollectibleChildren {
+  const _ExternalMaterialSurface({required this.child});
+  final Widget child;
+  @override
+  Iterable<Widget> get collectibleChildren => [child];
+  @override
+  State<_ExternalMaterialSurface> createState() => _ExternalMaterialSurfaceState();
+}
+
+class _ExternalMaterialSurfaceState extends State<_ExternalMaterialSurface> {
+  @override
+  Widget build(BuildContext context) =>
+      throw StateError('Do not build wrappers during structural collection');
 }
