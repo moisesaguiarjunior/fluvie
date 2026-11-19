@@ -14,7 +14,7 @@ typedef _ClipPlan = ({
 /// store keys, which source frames already sit in the [ClipFrameStore], and
 /// the bounded LRU window of decoded frames paint reads synchronously.
 final class _ClipStreamer {
-  final Map<MediaSource, _ClipPlan> _plans = {};
+  final Set<({MediaSource source, _ClipPlan plan})> _plans = {};
   final Map<MediaSource, String> _keys = {};
   final Map<MediaSource, Set<int>> _storedFrames = {};
   final LinkedHashMap<String, ui.Image> _window = LinkedHashMap<String, ui.Image>();
@@ -25,7 +25,9 @@ final class _ClipStreamer {
   /// The opaque store key for [source], assigned on first use.
   String keyFor(MediaSource source) => _keys.putIfAbsent(source, () => 'clip${_keyCounter++}');
 
-  void registerPlan(MediaSource source, _ClipPlan plan) => _plans[source] = plan;
+  void registerPlan(MediaSource source, _ClipPlan plan) => _plans.add((source: source, plan: plan));
+
+  void clearPlans() => _plans.clear();
 
   /// Extracts the not-yet-stored [sourceFrames] of [source] into [store] in
   /// chunks of [chunkSize], via the resolver's [extract] callback.
@@ -62,12 +64,12 @@ final class _ClipStreamer {
     required int windowCapacity,
     required String debugOwner,
   }) async {
-    for (final entry in _plans.entries) {
-      final clipMeta = meta[entry.key];
+    for (final (:source, :plan) in _plans) {
+      final clipMeta = meta[source];
       if (clipMeta == null) continue;
       await _ensureDecoded(
-        source: entry.key,
-        sourceFrame: _resample(compFrame, entry.value, clipMeta.fps),
+        source: source,
+        sourceFrame: _resample(compFrame, plan, clipMeta.fps),
         store: store,
         meta: clipMeta,
         // Every registered clip warms one frame per composition frame, so the

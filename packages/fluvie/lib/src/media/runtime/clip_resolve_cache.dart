@@ -1,3 +1,4 @@
+// fluvie:large-file-ok: shared clip cache facade; the streaming window lives in the sibling part
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
@@ -176,6 +177,9 @@ mixin ClipResolveCache on ImageResolveCache {
       trimEndFrames: trimEndFrames,
     ));
   }
+
+  /// Starts a new composition's clip planning while reusing the source cache.
+  void clearClipPlans() => _streamer.clearPlans();
 
   /// Streaming decode-ahead: decodes (into the bounded window) the frame every
   /// registered clip paints on composition frame [compFrame], loading it from

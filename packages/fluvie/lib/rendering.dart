@@ -56,11 +56,13 @@ export 'src/rendering/platform/ffmpeg_runner_registry.dart'
 export 'src/rendering/platform/wasm_runtime.dart' show WasmRuntime;
 export 'src/rendering/platform/wasm_runtime_bindings.dart' show createWasmRuntime;
 export 'src/rendering/primitives/fade_box.dart';
+export 'src/rendering/raw_frame_png.dart' show encodeRawFramePng;
 export 'src/rendering/render_aspect.dart'
     show RenderAspectResult, ShellFramePump, ShellMount, render;
 export 'src/rendering/render_cleanup.dart' show runGuarded;
 export 'src/rendering/render_config.dart';
 export 'src/rendering/render_duration.dart' show frameCountFor;
+export 'src/rendering/render_frame.dart' show captureFrame, frameIndexFor, resolveFrameCapture;
 export 'src/rendering/render_options.dart'
     show parseAspect, parseExportFormat, parsePosterTime, parseQuality, writeRenderProgress;
 export 'src/rendering/render_progress.dart' show RenderProgress, RenderProgressCallback;

@@ -20,7 +20,8 @@ abstract interface class ClipFramePreparer {
   /// The clip is alive over `[windowStart, windowStart + windowLength)` in
   /// composition space at [compFps]; the trimmed source spans
   /// `[trimStartFrames, trimEndFrames)`. The source fps comes from the clip's
-  /// already-probed metadata. Idempotent per source.
+  /// already-probed metadata. Identical placements are idempotent, and
+  /// distinct placements of the same source are registered separately.
   void registerClipPlan({
     required MediaSource source,
     required int windowStart,

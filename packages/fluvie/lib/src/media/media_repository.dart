@@ -127,6 +127,7 @@ final class MediaRepository
 
   @override
   Future<void> preResolveAll(Iterable<MediaSource> sources) async {
+    clearClipPlans();
     await _resolveAll(sources);
     markResolved();
   }

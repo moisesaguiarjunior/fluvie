@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:fluvie/src/composition/runtime/clip_plan_collector.dart' show collectClipPlans;
 import 'package:fluvie/src/core/contracts/clip_frame_preparer.dart';
 import 'package:fluvie/src/core/contracts/generative_resolver.dart';
 import 'package:fluvie/src/core/contracts/media_resolver.dart';
 import 'package:fluvie/src/elements/runtime/clip_frame_planner.dart';
+import 'package:fluvie/src/elements/runtime/clip_resampler.dart';
 import 'package:fluvie/src/rendering/collect_composition_media.dart';
 
 /// Pre-resolves every clip in [composition] before the frame loop: probe each
@@ -16,7 +19,7 @@ import 'package:fluvie/src/rendering/collect_composition_media.dart';
 /// content-hashed there first). Planning uses the video's own fps, the same clock
 /// the painter resamples against.
 ///
-/// Planning covers each clip from its scene start through the **end of the
+/// Planning covers each clip from its window start through the **end of the
 /// composition** ([totalFrames]), not just its own scene window: a `Clip` painter
 /// rebuilds on every composition frame, and outside its window the resampler
 /// clamps to the clip's first or last source frame. So a clip in an early scene
@@ -25,32 +28,53 @@ import 'package:fluvie/src/rendering/collect_composition_media.dart';
 /// planned set stays the in-window frames plus those boundary frames.
 ///
 /// A [resolver] that streams clip frames (implements [ClipFramePreparer]) also
-/// gets each clip's scene-relative plan registered here, so the capture loop's
+/// gets each clip's plan registered here, so the capture loop's
 /// per-frame `prepareClipFrames` can decode just the window each frame needs
 /// rather than every frame at once.
+/// When [compositionFrames] is supplied, extract only the frames read at
+/// those composition indices, using the resolved scene offsets.
 Future<void> preResolveCompositionClips({
   required Widget composition,
   required MediaResolver resolver,
   required int totalFrames,
   GenerativeResolver? generative,
+  Iterable<int>? compositionFrames,
 }) async {
   final video = compositionVideo(composition);
   if (video == null) return;
   final fps = video.fps;
   final preparer = resolver is ClipFramePreparer ? resolver as ClipFramePreparer : null;
-  for (final plan in collectClipPlans(video.scenes, fps, generative: generative)) {
+  final plans = collectClipPlans(
+    video.scenes,
+    fps,
+    generative: generative,
+    sceneStartFrames: video.sceneStartFrames,
+    videoFrames: video.totalFrames,
+  );
+  for (final plan in plans) {
     final meta = await resolver.probeClip(plan.source);
     final bounds = resolveClipTrimBounds(plan.trim, meta);
-    final frames = planClipFrames(
-      windowStart: 0,
-      // From the clip's scene start to the composition end, so the frames it is
-      // clamped to while painting off-screen in later scenes are extracted too.
-      windowLength: totalFrames - plan.windowStart,
-      compFps: fps,
-      srcFps: meta.fps,
-      trimStartFrames: bounds.start,
-      trimEndFrames: bounds.end,
-    );
+    final frames = compositionFrames == null
+        ? planClipFrames(
+            windowStart: 0,
+            // A clip past the requested end still reads its first frame at mount.
+            windowLength: math.max(1, totalFrames - plan.windowStart),
+            compFps: fps,
+            srcFps: meta.fps,
+            trimStartFrames: bounds.start,
+            trimEndFrames: bounds.end,
+          )
+        : {
+            for (final frame in compositionFrames)
+              resampleClipFrame(
+                compFrame: frame,
+                windowStart: plan.windowStart,
+                compFps: fps,
+                srcFps: meta.fps,
+                trimStartFrames: bounds.start,
+                trimEndFrames: bounds.end,
+              ),
+          };
     if (frames.isEmpty) continue;
     preparer?.registerClipPlan(
       source: plan.source,

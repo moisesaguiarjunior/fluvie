@@ -5,7 +5,6 @@ import 'package:flutter/widgets.dart' show GlobalKey, Widget;
 import 'package:fluvie/src/audio/encoding/audio_mix_staging.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/composition/runtime/audio_collector.dart';
-import 'package:fluvie/src/composition/runtime/caption_collector.dart';
 import 'package:fluvie/src/composition/runtime/clip_plan_collector.dart'
     show ClipAudioPlan, collectClipAudioPlans;
 import 'package:fluvie/src/composition/video.dart';
@@ -19,9 +18,8 @@ import 'package:fluvie/src/core/defaults.dart';
 import 'package:fluvie/src/rendering/capture/capture_shell.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/clip_audio_staging.dart';
-import 'package:fluvie/src/rendering/collect_composition_media.dart';
 import 'package:fluvie/src/rendering/no_generative_resolver.dart';
-import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
+import 'package:fluvie/src/rendering/prepare_composition_media.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
 import 'package:fluvie/src/rendering/render_service.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
@@ -108,24 +106,13 @@ Future<RenderAspectResult> render({
   // produces the files, the media pre-pass warms the decode cache, and the clip
   // pre-pass probes each clip — so the audio collector below knows which clips
   // actually carry an audio track. A null resolver is a media-less render.
-  if (resolver != null) {
-    await generative.generateAll(
-      collectCompositionGenerative(composition),
-      onProgress: onGenerativeProgress,
-    );
-    await resolver.preResolveAll(collectCompositionMedia(composition, generative: generative));
-    final video = compositionVideo(composition);
-    final captionSource = video == null ? null : collectCaptionSource(video);
-    if (captionSource != null) {
-      await resolver.preResolveCaptions(captionSource);
-    }
-    await preResolveCompositionClips(
-      composition: composition,
-      resolver: resolver,
-      totalFrames: frameCount,
-      generative: generative,
-    );
-  }
+  await prepareCompositionMedia(
+    composition: composition,
+    totalFrames: frameCount,
+    resolver: resolver,
+    generative: generative,
+    onGenerativeProgress: onGenerativeProgress,
+  );
   // The encoder audio mix: an explicit stager wins; otherwise a `Video`
   // composition's own `Audio` tracks (plus any generated audio and a clip's
   // embedded audio) are collected and staged so a public `render(video, aspect:)`

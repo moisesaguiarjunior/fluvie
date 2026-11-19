@@ -12,7 +12,15 @@
 library;
 
 export 'package:fluvie/rendering.dart'
-    show NetworkAllowlist, RenderPhase, RenderProgress, RenderProgressCallback, VideoRenderer;
+    show
+        NetworkAllowlist,
+        RawFrame,
+        RenderPhase,
+        RenderProgress,
+        RenderProgressCallback,
+        VideoRenderer,
+        encodeRawFramePng,
+        frameIndexFor;
 
 export 'src/capture_host.dart';
 export 'src/fake/fake_mobile_video_encoder.dart';
