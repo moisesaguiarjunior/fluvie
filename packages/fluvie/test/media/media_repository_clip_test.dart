@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
@@ -18,6 +19,7 @@ import 'package:fluvie/src/media/runtime/clip_resolve_cache.dart';
 import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 import 'package:fluvie/src/rendering/encoding/frame_extraction_service.dart';
 import 'package:fluvie/src/rendering/encoding/video_probe_service.dart';
+import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
 
 class _MapBundle extends CachingAssetBundle {
   _MapBundle(this._data);
@@ -125,12 +127,13 @@ const _probeResult = VideoProbeResult(
 );
 
 void main() {
-  test('streaming warms distinct placements and resets them for the next composition', () async {
+  test('streaming warms distinct placements and keeps them across a source refresh', () async {
     final store = _MemoryClipStore();
+    final extractor = _FakeExtractor();
     final repo = _repo(
       assets: {'clip_1s.mp4': Uint8List(16)},
       probe: _FakeProbe(_probeResult),
-      extractor: _FakeExtractor(),
+      extractor: extractor,
       clipFrameStore: store,
     );
     addTearDown(repo.dispose);
@@ -145,13 +148,28 @@ void main() {
         trimEndFrames: 30,
       );
     }
-    await repo.preResolveClip(_clip, [0, 10]);
+    await repo.preResolveClip(_clip, [0, 1, 10, 11]);
     await repo.prepareClipFrames(0);
     expect(repo.decodedClipFrame(_clip, 0).width, 2);
     expect(repo.decodedClipFrame(_clip, 10).width, 2);
 
     await repo.preResolveAll(const []);
-    await repo.prepareClipFrames(1); // Neither source frame 1 nor 11 is stored.
+    await repo.prepareClipFrames(1);
+    expect(repo.decodedClipFrame(_clip, 1).width, 2);
+    expect(repo.decodedClipFrame(_clip, 11).width, 2);
+
+    await expectLater(
+      repo.prepareClipFrames(2),
+      throwsA(isA<FluvieRenderException>()),
+    );
+    await preResolveCompositionClips(
+      composition: const SizedBox(),
+      resolver: repo,
+      totalFrames: 1,
+    );
+    await repo.prepareClipFrames(2);
+    await repo.preResolveClip(_clip, [0, 1, 10, 11]);
+    expect(extractor.extracted, [0, 1, 10, 11]);
   });
 
   test('preResolveClip probes once and extracts the listed frames', () async {

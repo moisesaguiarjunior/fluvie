@@ -7,7 +7,7 @@ import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 /// Encodes one captured [RawFrame] (RGBA8888, alpha preserved) into PNG bytes
 /// via the Flutter engine codec, without touching the file system.
 ///
-/// Throws an [ArgumentError] when [frame] has invalid dimensions, or a
+/// Throws an [ArgumentError] when [frame] has invalid dimensions or byte length, or a
 /// [FluvieRenderException] if the engine returns no PNG bytes. Codec errors
 /// propagate through the returned future.
 Future<Uint8List> encodeRawFramePng(RawFrame frame) async {
@@ -18,7 +18,11 @@ Future<Uint8List> encodeRawFramePng(RawFrame frame) async {
     throw ArgumentError.value(frame.height, 'frame.height', 'must be positive');
   }
   // Divide the buffer length to validate dimensions without integer overflow.
-  if (frame.rgba.length ~/ 4 ~/ frame.width != frame.height) {
+  final byteLength = frame.rgba.length;
+  final pixelCount = byteLength ~/ 4;
+  if (byteLength % 4 != 0 ||
+      pixelCount % frame.width != 0 ||
+      pixelCount ~/ frame.width != frame.height) {
     throw ArgumentError('RGBA bytes do not fit dimensions ${frame.width}x${frame.height}.');
   }
   final image = await _decodeFrame(frame);

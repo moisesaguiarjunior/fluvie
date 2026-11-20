@@ -14,6 +14,10 @@ import 'package:fluvie/src/core/media/media_source.dart';
 /// do not implement this; the loop then skips the decode-ahead step and their
 /// behavior is unchanged.
 abstract interface class ClipFramePreparer {
+  /// Drops plans from an earlier composition. Extracted source frames stay
+  /// available. Call this once before registering the next composition.
+  void clearClipPlans();
+
   /// Records how [source] maps composition frames to source frames so
   /// [prepareClipFrames] can resolve the frame any composition frame needs.
   ///

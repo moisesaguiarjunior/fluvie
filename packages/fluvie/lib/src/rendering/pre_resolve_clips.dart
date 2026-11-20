@@ -11,8 +11,8 @@ import 'package:fluvie/src/rendering/collect_composition_media.dart';
 
 /// Pre-resolves every clip in [composition] before the frame loop: probe each
 /// for its [ClipMetadata], plan the source frames it reads, and extract them
-/// through [resolver]. A no-op when the composition declares no clips or wraps no
-/// `Video`.
+/// through [resolver]. A streaming resolver drops the previous composition's
+/// plans even if this composition declares no clips or wraps no `Video`.
 ///
 /// Capture is synchronous, so a clip cannot decode mid-frame: its frames must be
 /// extracted up front. Run this after `preResolveAll` (a clip source is
@@ -40,10 +40,11 @@ Future<void> preResolveCompositionClips({
   GenerativeResolver? generative,
   Iterable<int>? compositionFrames,
 }) async {
+  final preparer = resolver is ClipFramePreparer ? resolver as ClipFramePreparer : null;
+  preparer?.clearClipPlans();
   final video = compositionVideo(composition);
   if (video == null) return;
   final fps = video.fps;
-  final preparer = resolver is ClipFramePreparer ? resolver as ClipFramePreparer : null;
   final plans = collectClipPlans(
     video.scenes,
     fps,

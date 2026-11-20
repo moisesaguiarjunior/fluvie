@@ -25,14 +25,11 @@ typedef ClipPlan = ({
   TimeRange? trim,
 });
 
-/// Pairs every clip-painting carrier in [scenes] (a `Clip` element or a
-/// `Background.video`) with its scene duration in frames at [fps] and its trim —
-/// the input the clip pre-pass plans source frames from.
+/// Pairs each clip-painting carrier in [scenes] with its trim and its resolved
+/// scene or enclosing element window in frames at [fps].
 ///
-/// It reuses the shared tree walk per scene, so it finds clips wherever
-/// `collectMediaSources` finds their sources, then keeps only the clip-kind
-/// sources (`.mp4`/`.mov`/`.webm`). Element windows resolve against the same
-/// enclosing scope as the mounted clip painter.
+/// Walks [declaredChildren] and resolves animated element windows against the
+/// same enclosing scope as the mounted clip painter.
 /// Pass [sceneStartFrames] and [videoFrames] to use the resolved video
 /// timeline, including overlaps and its root scope.
 List<ClipPlan> collectClipPlans(
