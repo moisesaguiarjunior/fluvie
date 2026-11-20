@@ -9,8 +9,10 @@ habits that keep a render fast. Start with the biggest lever, the frame cache:
 fluvie render ./lib/my_video.dart --out out.mp4 --cache
 ```
 
-Run that twice and the second run reads frames from disk instead of pumping the
-widget tree. The rest of this page covers why, and why you have to ask for it.
+Run that twice and the second run reuses the stored pixels instead of reading
+them back from the widget tree. Each frame is still pumped, so widget state
+keeps advancing. The rest of this page covers why, and why you have to ask
+for it.
 
 ## Capture and encode are two phases
 
@@ -30,9 +32,9 @@ each frame pumps a full tree. The encode is one FFmpeg pass over those frames.
 
 Captured frames are stored on disk, keyed by a render digest. The digest combines
 the composition key, the render config, and the Fluvie version. On the next run, a
-frame whose digest and index are already on disk replays from the cache without
-pumping the tree at all. For a file target there is no registry key, so the file's
-path stands in.
+frame whose digest and index are already on disk reuses those pixels. The loop
+still pumps that frame, and it skips the pixel readback. For a file target
+there is no registry key, so the file's path stands in.
 
 The cache is advisory: the digest does not cover the composition's source code. An
 edited composition with the same size and frame count keeps the same digest, so it

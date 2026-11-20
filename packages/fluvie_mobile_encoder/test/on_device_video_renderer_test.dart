@@ -108,6 +108,49 @@ void main() {
     expect(File(req.framesPath).lengthSync(), 3 * 64 * 64 * 4);
   });
 
+  testWidgets('metrics leave the captured frames identical and time the encode', (tester) async {
+    final timedSandbox = _sandbox();
+    final plainSandbox = _sandbox();
+    final report = RenderMetrics();
+
+    Future<void> shoot(Directory sandbox, RenderMetrics? metrics) {
+      final renderer = OnDeviceVideoRenderer(
+        encoder: FakeMobileVideoEncoder(),
+        hostFactory: (size) => _TesterCaptureHost(tester, size),
+        sandboxFactory: () async => sandbox,
+      );
+      return renderer.render(
+        composition: _composition,
+        aspect: Aspect.square,
+        duration: const Duration(milliseconds: 100),
+        longEdge: 64,
+        metrics: metrics,
+      );
+    }
+
+    await tester.runAsync(() async {
+      await shoot(timedSandbox, report);
+      await shoot(plainSandbox, null);
+    });
+
+    expect(report.frameCount, 3);
+    expect(
+      report.preparation.samples,
+      3,
+      reason: 'composition media, the clip window, and RenderService preparation',
+    );
+    expect(report.mounting.samples, 1);
+    expect(report.pumping.samples, 3);
+    expect(report.readback.samples, 3);
+    expect(report.encoding.samples, 1);
+    expect(report.cacheHits, 0);
+    expect(report.cacheMisses, 0);
+    expect(
+      File('${timedSandbox.path}/frames.rgba').readAsBytesSync(),
+      File('${plainSandbox.path}/frames.rgba').readAsBytesSync(),
+    );
+  });
+
   testWidgets('never disposes a caller-injected media resolver', (tester) async {
     final sandbox = _sandbox();
     final tracking = _TrackingResolver();

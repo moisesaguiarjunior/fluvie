@@ -44,6 +44,7 @@ import 'package:fluvie/src/rendering/no_media_resolver.dart';
 import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
 import 'package:fluvie/src/rendering/render_aspect.dart' show ShellFramePump, ShellMount;
 import 'package:fluvie/src/rendering/render_config.dart';
+import 'package:fluvie/src/rendering/render_metrics.dart';
 import 'package:fluvie/src/rendering/render_service.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
 import 'package:fluvie/src/timing/time_scope_data.dart';
@@ -186,7 +187,10 @@ class _CountingCaptureService implements FrameCaptureService {
 /// inject a fake; the caller then keeps ownership and it is never disposed.
 ///
 /// Encoding is not part of this: the returned [RenderManifest] carries the
-/// complete ffmpeg argument array for a caller to run.
+/// complete ffmpeg argument array for a caller to run. Pass [metrics] to record
+/// preparation, mounting, frame pumping, pixel readback, and cache hits. The
+/// encoding stage stays empty. Omit [metrics] and this capture allocates no
+/// timing state. The captured frames do not depend on the report.
 Future<RenderManifest> renderVideo({
   required Video video,
   required Directory outDir,
@@ -210,6 +214,7 @@ Future<RenderManifest> renderVideo({
   FrameCaptureService capture = const RepaintBoundaryCaptureService(),
   void Function(int completed, int total)? onProgress,
   void Function(int hits, int total)? onCacheReport,
+  RenderMetrics? metrics,
 }) async {
   // An aspect re-derives the canvas from aspect.sizeFor(longEdge), where longEdge
   // is the video's longer side; absent, the declared size wins (so a plain render
@@ -256,54 +261,62 @@ Future<RenderManifest> renderVideo({
   try {
     // Real IO — ffmpeg probes and extracts, the bundle reads, `toImage` reads back
     // — needs a real event loop, which fake async never pumps.
-    await runAsync(() async {
-      if (active != null) {
-        // Images first: a clip source is content-hashed here before it is probed.
-        await active.preResolveAll(mediaSources);
-        await preResolveCompositionClips(
-          composition: video,
-          resolver: active,
-          totalFrames: frameCount,
-        );
-        if (snapshotSources.isNotEmpty) {
-          await active.preResolveSnapshots(
-            snapshotSources,
-            snapshotService ?? _missingSnapshotService(),
-          );
-        }
-        if (captionSource != null) await active.preResolveCaptions(captionSource);
-        if (reactiveTracks.allSources.isNotEmpty) {
-          await active.preResolveReactive(
-            reactiveTracks.allSources,
-            beatDetector: beatDetector ?? SpectralBeatDetectionService(),
-            analyzer: analyzer ?? SpectralFrequencyAnalyzer(),
-            fps: config.fps,
+    final mediaWatch = metrics == null ? null : (Stopwatch()..start());
+    try {
+      await runAsync(() async {
+        if (active != null) {
+          // Images first: a clip source is content-hashed here before it is probed.
+          await active.preResolveAll(mediaSources);
+          await preResolveCompositionClips(
+            composition: video,
+            resolver: active,
             totalFrames: frameCount,
           );
+          if (snapshotSources.isNotEmpty) {
+            await active.preResolveSnapshots(
+              snapshotSources,
+              snapshotService ?? _missingSnapshotService(),
+            );
+          }
+          if (captionSource != null) await active.preResolveCaptions(captionSource);
+          if (reactiveTracks.allSources.isNotEmpty) {
+            await active.preResolveReactive(
+              reactiveTracks.allSources,
+              beatDetector: beatDetector ?? SpectralBeatDetectionService(),
+              analyzer: analyzer ?? SpectralFrequencyAnalyzer(),
+              fps: config.fps,
+              totalFrames: frameCount,
+            );
+          }
         }
+        // The in-process Snapshot subtree-capture pre-pass: rasterize every Snapshot
+        // child once under the resolver (so an inner Image/Clip paints from the
+        // decoded cache), then mount the result above the composition. Without it a
+        // Snapshot in capture finds no scope and re-rasterizes every frame.
+        //
+        // Outside the resolver branch deliberately: a `Snapshot` over plain widgets
+        // declares no MediaSource and no SnapshotSource, so it needs no resolver at
+        // all, but it still needs its raster before frame 0.
+        snapshotScope = await _captureSnapshotScope(
+          scenes: video.scenes,
+          resolver: active,
+          width: width,
+          height: height,
+          compositionWidth: video.width,
+          compositionHeight: video.height,
+          seed: video.seed,
+          aspect: aspect,
+          pumpWidget: pumpWidget,
+          setViewSize: setViewSize,
+        );
+        return null;
+      });
+    } finally {
+      if (mediaWatch != null) {
+        mediaWatch.stop();
+        metrics!.addPreparation(mediaWatch.elapsed);
       }
-      // The in-process Snapshot subtree-capture pre-pass: rasterize every Snapshot
-      // child once under the resolver (so an inner Image/Clip paints from the
-      // decoded cache), then mount the result above the composition. Without it a
-      // Snapshot in capture finds no scope and re-rasterizes every frame.
-      //
-      // Outside the resolver branch deliberately: a `Snapshot` over plain widgets
-      // declares no MediaSource and no SnapshotSource, so it needs no resolver at
-      // all, but it still needs its raster before frame 0.
-      snapshotScope = await _captureSnapshotScope(
-        scenes: video.scenes,
-        resolver: active,
-        width: width,
-        height: height,
-        compositionWidth: video.width,
-        compositionHeight: video.height,
-        seed: video.seed,
-        aspect: aspect,
-        pumpWidget: pumpWidget,
-        setViewSize: setViewSize,
-      );
-      return null;
-    });
+    }
     // The pre-pass repointed the view while rasterizing; restore the render size.
     setViewSize(width, height);
 
@@ -341,11 +354,27 @@ Future<RenderManifest> renderVideo({
     // pumpWidget builds at frame 0, before the capture loop's first decode-ahead,
     // so without this the first build's synchronous clip lookup would miss (that
     // build is not captured — the loop re-pumps frame 0 — but it would still throw).
-    await runAsync(() async {
-      await preparer?.prepareClipFrames(0);
-      return null;
-    });
-    await pumpWidget(shell.tree);
+    final clipWatch = metrics == null ? null : (Stopwatch()..start());
+    try {
+      await runAsync(() async {
+        await preparer?.prepareClipFrames(0);
+        return null;
+      });
+    } finally {
+      if (clipWatch != null) {
+        clipWatch.stop();
+        metrics!.addPreparation(clipWatch.elapsed);
+      }
+    }
+    final mountWatch = metrics == null ? null : (Stopwatch()..start());
+    try {
+      await pumpWidget(shell.tree);
+    } finally {
+      if (mountWatch != null) {
+        mountWatch.stop();
+        metrics!.addMounting(mountWatch.elapsed);
+      }
+    }
 
     final activeAspect =
         aspect ??
@@ -393,6 +422,7 @@ Future<RenderManifest> renderVideo({
         export: export,
         posterFrame: posterFrame,
         onProgress: onProgress,
+        metrics: metrics,
         // Every source was pre-resolved above (images and clip frames alike); the
         // resolver is idempotent, so the service needs no re-pass — and re-passing
         // clip sources would try to decode a video as an image.

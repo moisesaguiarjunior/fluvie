@@ -24,6 +24,7 @@ draft.
 | guides/ | [audio-and-captions](guides/audio-and-captions.md) | shipped |
 | guides/ | [exporting-your-video](guides/exporting-your-video.md) | shipped |
 | guides/ | [capturing-a-single-frame](guides/capturing-a-single-frame.md) | fork |
+| guides/ | [render-metrics](guides/render-metrics.md) | fork |
 | guides/ | [managing-ffmpeg](guides/managing-ffmpeg.md) | shipped |
 | guides/ | [authoring-with-specs](guides/authoring-with-specs.md) | shipped |
 | guides/ | [ai-and-mcp](guides/ai-and-mcp.md) | shipped |

@@ -17,6 +17,7 @@ import 'package:fluvie/src/rendering/frame_capture_loop.dart';
 import 'package:fluvie/src/rendering/io/file_render_sandbox.dart';
 import 'package:fluvie/src/rendering/no_media_resolver.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
+import 'package:fluvie/src/rendering/render_metrics.dart';
 
 // FramePump and ProgressCallback now live in the dart:io-free frame_capture_loop
 // so the capture loop is shared by the desktop, mobile, and web backends;
@@ -71,6 +72,11 @@ final class RenderService {
   /// capture under [boundaryKey] and cache store on a miss, append to the frames
   /// file) → manifest write. The manifest embeds the complete encode
   /// argument array from [VideoEncoderService.planEncodeArgs].
+  ///
+  /// Pass [metrics] to record one preparation sample around media
+  /// pre-resolution, audio pre-resolution, and mix staging, then pumping,
+  /// readback, and cache hits in the shared loop. [render] records each
+  /// encoder call on that same report.
   Future<RenderManifest> captureToDirectory({
     required RenderConfig config,
     required Directory outDir,
@@ -83,30 +89,39 @@ final class RenderService {
     Export? export,
     int? posterFrame,
     ProgressCallback? onProgress,
+    RenderMetrics? metrics,
   }) async {
-    await media.preResolveAll(mediaSources);
-    await media.preResolveAudio(audioSources);
-    final digest = renderDigest(
-      config: config,
-      compositionKey: compositionKey,
-      fluvieVersion: fluvieRenderVersion,
+    final prepared = await timeStage(
+      metrics,
+      (report, elapsed) => report.addPreparation(elapsed),
+      () async {
+        await media.preResolveAll(mediaSources);
+        await media.preResolveAudio(audioSources);
+        final digest = renderDigest(
+          config: config,
+          compositionKey: compositionKey,
+          fluvieVersion: fluvieRenderVersion,
+        );
+        final sandbox = FileRenderSandbox(outDir);
+        await sandbox.create();
+        final lanes = stageAudio == null
+            ? const (nodes: <FfmpegAudioNode>[], amix: null)
+            : await stageAudio(resolver: media, sandbox: outDir);
+        return (digest: digest, sandbox: sandbox, lanes: lanes);
+      },
     );
-    final sandbox = FileRenderSandbox(outDir);
-    await sandbox.create();
-    final lanes = stageAudio == null
-        ? const (nodes: <FfmpegAudioNode>[], amix: null)
-        : await stageAudio(resolver: media, sandbox: outDir);
-    final sink = sandbox.openFrames(VideoEncoderService.framesFileName);
+    final sink = prepared.sandbox.openFrames(VideoEncoderService.framesFileName);
     try {
       await runFrameCaptureLoop(
         config: config,
-        digest: digest,
+        digest: prepared.digest,
         pump: pump,
         boundaryKey: boundaryKey,
         sink: sink,
         capture: _capture,
         store: _cache == null ? null : FrameCacheStore(_cache),
         onProgress: onProgress,
+        metrics: metrics,
       );
     } finally {
       await sink.close();
@@ -118,11 +133,11 @@ final class RenderService {
       frameCount: config.frameCount,
       framesFileName: VideoEncoderService.framesFileName,
       outputFileName: encoder.outputNameFor(export),
-      renderDigest: digest,
+      renderDigest: prepared.digest,
       ffmpegArgs: encoder.planEncodeArgs(
         config,
-        audio: lanes.nodes,
-        amix: lanes.amix,
+        audio: prepared.lanes.nodes,
+        amix: prepared.lanes.amix,
         export: export,
       ),
       posterFileName: posterFrame == null ? null : VideoEncoderService.posterFileName,
@@ -130,12 +145,13 @@ final class RenderService {
           ? null
           : encoder.planPosterArgs(config, posterFrame: posterFrame),
     );
-    await sandbox.writeText('manifest.json', jsonEncode(manifest.toJson()));
+    await prepared.sandbox.writeText('manifest.json', jsonEncode(manifest.toJson()));
     return manifest;
   }
 
   /// [captureToDirectory] followed by an in-process encode through [runner],
-  /// returning the encoded `outDir/out.mp4`.
+  /// returning the encoded `outDir/out.mp4`. Each encoder call, including a
+  /// poster, is one encoding sample when [metrics] is set.
   Future<File> render({
     required RenderConfig config,
     required Directory outDir,
@@ -149,6 +165,7 @@ final class RenderService {
     Export? export,
     int? posterFrame,
     ProgressCallback? onProgress,
+    RenderMetrics? metrics,
   }) async {
     final manifest = await captureToDirectory(
       config: config,
@@ -162,11 +179,20 @@ final class RenderService {
       export: export,
       posterFrame: posterFrame,
       onProgress: onProgress,
+      metrics: metrics,
     );
-    await runner.encode(args: manifest.ffmpegArgs, sandbox: outDir);
+    await timeStage(
+      metrics,
+      (report, elapsed) => report.addEncoding(elapsed),
+      () => runner.encode(args: manifest.ffmpegArgs, sandbox: outDir),
+    );
     final posterArgs = manifest.posterArgs;
     if (posterArgs != null) {
-      await runner.encode(args: posterArgs, sandbox: outDir);
+      await timeStage(
+        metrics,
+        (report, elapsed) => report.addEncoding(elapsed),
+        () => runner.encode(args: posterArgs, sandbox: outDir),
+      );
     }
     return File('${outDir.path}/${manifest.outputFileName}');
   }

@@ -63,6 +63,7 @@ export 'src/rendering/render_cleanup.dart' show runGuarded;
 export 'src/rendering/render_config.dart';
 export 'src/rendering/render_duration.dart' show frameCountFor;
 export 'src/rendering/render_frame.dart' show captureFrame, frameIndexFor, resolveFrameCapture;
+export 'src/rendering/render_metrics.dart' show RenderMetrics, StageTiming;
 export 'src/rendering/render_options.dart'
     show parseAspect, parseExportFormat, parsePosterTime, parseQuality, writeRenderProgress;
 export 'src/rendering/render_progress.dart' show RenderProgress, RenderProgressCallback;

@@ -4,6 +4,7 @@ import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 import 'package:fluvie/src/rendering/encoding/frame_store.dart';
 import 'package:fluvie/src/rendering/io/render_sandbox.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
+import 'package:fluvie/src/rendering/render_metrics.dart';
 
 /// Pumps the tree to frame `n` and returns once that frame is fully built —
 /// the host (a widget test, the capture harness, the off-screen web/mobile
@@ -39,6 +40,10 @@ typedef FrameHandler = Future<void> Function(RawFrame frame);
 /// Provide exactly one frame consumer: a [sink] the raw bytes are appended to
 /// (desktop/mobile/server), or an [onFrame] handler each [RawFrame] is passed to
 /// (the bounded-memory web PNG path). When [onFrame] is set the [sink] is unused.
+///
+/// Pass [metrics] to record each pump, each pixel readback, and cache hits the
+/// loop already knows. A hit still pumps and skips readback. Cache lookup time
+/// is not a readback. Omit [metrics] and the loop allocates no timing state.
 Future<void> runFrameCaptureLoop({
   required RenderConfig config,
   required String digest,
@@ -49,6 +54,7 @@ Future<void> runFrameCaptureLoop({
   FrameHandler? onFrame,
   FrameStore? store,
   ProgressCallback? onProgress,
+  RenderMetrics? metrics,
 }) async {
   if ((sink == null) == (onFrame == null)) {
     throw ArgumentError('Provide exactly one of sink or onFrame.');
@@ -57,10 +63,19 @@ Future<void> runFrameCaptureLoop({
   final useStore = config.cacheEnabled && store != null;
   final end = config.startFrame + config.frameCount;
   for (var frame = config.startFrame; frame < end; frame++) {
-    await pump(frame);
+    final pumpWatch = metrics == null ? null : (Stopwatch()..start());
+    try {
+      await pump(frame);
+    } finally {
+      if (pumpWatch != null) {
+        pumpWatch.stop();
+        metrics!.addPumping(pumpWatch.elapsed);
+      }
+    }
     final cached = useStore ? await store.lookup(digest, frame) : null;
     final RawFrame raw;
     if (cached != null && cached.length == frameBytes) {
+      metrics?.addCacheHit();
       raw = RawFrame(
         frameIndex: frame,
         width: config.width,
@@ -68,12 +83,21 @@ Future<void> runFrameCaptureLoop({
         rgba: cached,
       );
     } else {
-      raw = await capture.capture(
-        boundaryKey: boundaryKey,
-        frameIndex: frame,
-        width: config.width,
-        height: config.height,
-      );
+      if (useStore) metrics?.addCacheMiss();
+      final readbackWatch = metrics == null ? null : (Stopwatch()..start());
+      try {
+        raw = await capture.capture(
+          boundaryKey: boundaryKey,
+          frameIndex: frame,
+          width: config.width,
+          height: config.height,
+        );
+      } finally {
+        if (readbackWatch != null) {
+          readbackWatch.stop();
+          metrics!.addReadback(readbackWatch.elapsed);
+        }
+      }
       if (useStore) await store.store(digest, frame, raw.rgba);
     }
     if (onFrame != null) {
@@ -81,6 +105,7 @@ Future<void> runFrameCaptureLoop({
     } else {
       sink!.add(raw.rgba);
     }
+    metrics?.addFrame();
     // Report after the frame is consumed (cache hit or fresh capture alike), so
     // a progress reader sees monotonically rising completion. Observational
     // only: it reads no clock and never changes a frame's bytes.

@@ -99,6 +99,44 @@ void main() {
     expect(sandboxCalls, 0);
   });
 
+  testWidgets('a metrics report leaves the still frame unchanged', (tester) async {
+    final renderer = OnDeviceVideoRenderer(
+      encoder: FakeMobileVideoEncoder(),
+      hostFactory: (size) => _TesterCaptureHost(tester, size),
+      sandboxFactory: () async => Directory.systemTemp,
+    );
+    const composition = ColoredBox(color: Color(0xFF112233));
+    final report = RenderMetrics();
+
+    final timed = await tester.runAsync(
+      () => renderer.captureFrame(
+        composition: composition,
+        aspect: Aspect.square,
+        frame: 0,
+        longEdge: 16,
+        metrics: report,
+      ),
+    );
+    final plain = await tester.runAsync(
+      () => renderer.captureFrame(
+        composition: composition,
+        aspect: Aspect.square,
+        frame: 0,
+        longEdge: 16,
+      ),
+    );
+
+    expect(timed!.rgba, plain!.rgba);
+    expect(report.frameCount, 1);
+    expect(report.preparation.samples, 2);
+    expect(report.mounting.samples, 1);
+    expect(report.pumping.samples, 1);
+    expect(report.readback.samples, 1);
+    expect(report.encoding.samples, 0);
+    expect(report.cacheHits, 0);
+    expect(report.cacheMisses, 0);
+  });
+
   testWidgets('never disposes a caller-injected resolver and surfaces dispose warnings', (
     tester,
   ) async {
