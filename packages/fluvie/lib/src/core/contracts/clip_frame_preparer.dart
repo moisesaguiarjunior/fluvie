@@ -14,13 +14,18 @@ import 'package:fluvie/src/core/media/media_source.dart';
 /// do not implement this; the loop then skips the decode-ahead step and their
 /// behavior is unchanged.
 abstract interface class ClipFramePreparer {
+  /// Drops plans from an earlier composition. Extracted source frames stay
+  /// available. Call this once before registering the next composition.
+  void clearClipPlans();
+
   /// Records how [source] maps composition frames to source frames so
   /// [prepareClipFrames] can resolve the frame any composition frame needs.
   ///
   /// The clip is alive over `[windowStart, windowStart + windowLength)` in
   /// composition space at [compFps]; the trimmed source spans
   /// `[trimStartFrames, trimEndFrames)`. The source fps comes from the clip's
-  /// already-probed metadata. Idempotent per source.
+  /// already-probed metadata. Identical placements are idempotent, and
+  /// distinct placements of the same source are registered separately.
   void registerClipPlan({
     required MediaSource source,
     required int windowStart,

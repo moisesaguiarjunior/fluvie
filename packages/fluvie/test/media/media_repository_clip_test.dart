@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show SizedBox;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
@@ -14,9 +15,11 @@ import 'package:fluvie/src/media/media_bytes_loader.dart';
 import 'package:fluvie/src/media/media_repository.dart';
 import 'package:fluvie/src/media/net/media_http_client.dart';
 import 'package:fluvie/src/media/net/network_allowlist.dart';
+import 'package:fluvie/src/media/runtime/clip_resolve_cache.dart';
 import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 import 'package:fluvie/src/rendering/encoding/frame_extraction_service.dart';
 import 'package:fluvie/src/rendering/encoding/video_probe_service.dart';
+import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
 
 class _MapBundle extends CachingAssetBundle {
   _MapBundle(this._data);
@@ -27,6 +30,20 @@ class _MapBundle extends CachingAssetBundle {
     if (bytes == null) throw FluvieRenderException('asset not found: $key');
     return ByteData.view(bytes.buffer);
   }
+}
+
+class _MemoryClipStore implements ClipFrameStore {
+  final _frames = <(String, int), Uint8List>{};
+
+  @override
+  Future<void> put(String clipKey, int frame, Uint8List rgba) async =>
+      _frames[(clipKey, frame)] = rgba;
+
+  @override
+  Future<Uint8List?> get(String clipKey, int frame) async => _frames[(clipKey, frame)];
+
+  @override
+  Future<void> dispose() async => _frames.clear();
 }
 
 class _NoHttp implements MediaHttpClient {
@@ -88,6 +105,7 @@ MediaRepository _repo({
   required Map<String, Uint8List> assets,
   required VideoProbeService probe,
   required FrameExtractionService extractor,
+  ClipFrameStore? clipFrameStore,
 }) => MediaRepository(
   loader: MediaBytesLoader(
     bundle: _MapBundle(assets),
@@ -96,6 +114,7 @@ MediaRepository _repo({
   ),
   probeService: probe,
   frameExtractor: extractor,
+  clipFrameStore: clipFrameStore,
 );
 
 const _clip = MediaSource.asset('clip_1s.mp4');
@@ -108,6 +127,51 @@ const _probeResult = VideoProbeResult(
 );
 
 void main() {
+  test('streaming warms distinct placements and keeps them across a source refresh', () async {
+    final store = _MemoryClipStore();
+    final extractor = _FakeExtractor();
+    final repo = _repo(
+      assets: {'clip_1s.mp4': Uint8List(16)},
+      probe: _FakeProbe(_probeResult),
+      extractor: extractor,
+      clipFrameStore: store,
+    );
+    addTearDown(repo.dispose);
+    await repo.preResolveAll([_clip]);
+    for (final trim in [0, 10]) {
+      repo.registerClipPlan(
+        source: _clip,
+        windowStart: 0,
+        windowLength: 30,
+        compFps: 30,
+        trimStartFrames: trim,
+        trimEndFrames: 30,
+      );
+    }
+    await repo.preResolveClip(_clip, [0, 1, 10, 11]);
+    await repo.prepareClipFrames(0);
+    expect(repo.decodedClipFrame(_clip, 0).width, 2);
+    expect(repo.decodedClipFrame(_clip, 10).width, 2);
+
+    await repo.preResolveAll(const []);
+    await repo.prepareClipFrames(1);
+    expect(repo.decodedClipFrame(_clip, 1).width, 2);
+    expect(repo.decodedClipFrame(_clip, 11).width, 2);
+
+    await expectLater(
+      repo.prepareClipFrames(2),
+      throwsA(isA<FluvieRenderException>()),
+    );
+    await preResolveCompositionClips(
+      composition: const SizedBox(),
+      resolver: repo,
+      totalFrames: 1,
+    );
+    await repo.prepareClipFrames(2);
+    await repo.preResolveClip(_clip, [0, 1, 10, 11]);
+    expect(extractor.extracted, [0, 1, 10, 11]);
+  });
+
   test('preResolveClip probes once and extracts the listed frames', () async {
     final probe = _FakeProbe(_probeResult);
     final extractor = _FakeExtractor();

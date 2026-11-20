@@ -4,6 +4,9 @@ Recorded 2026-11-12. This is a maintainer decision for this fork. It is not
 an upstream Fluvie decision, and it does not change Social Studio until a
 later reviewed step says so.
 
+See the [rendering roadmap](rendering-roadmap.md) for the planned fork changes
+after native animation capture.
+
 ## Base
 
 This fork starts at tag `v0.3.1`, commit

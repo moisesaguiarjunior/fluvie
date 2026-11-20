@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/audio/encoding/resolved_audio_track.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
-import 'package:fluvie/src/composition/runtime/caption_collector.dart';
 import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/contracts/generative_resolver.dart'
     show GenerativeProgress, GenerativeResolver;
@@ -16,13 +15,12 @@ import 'package:fluvie/src/rendering/audio_sandbox_staging.dart';
 import 'package:fluvie/src/rendering/capture/capture_shell.dart';
 import 'package:fluvie/src/rendering/capture/frame_capture_service.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
-import 'package:fluvie/src/rendering/collect_composition_media.dart';
 import 'package:fluvie/src/rendering/encoding/content_hash.dart';
 import 'package:fluvie/src/rendering/encoding/video_encoder_service.dart';
 import 'package:fluvie/src/rendering/frame_capture_loop.dart';
 import 'package:fluvie/src/rendering/io/render_sandbox.dart';
 import 'package:fluvie/src/rendering/no_generative_resolver.dart';
-import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
+import 'package:fluvie/src/rendering/prepare_composition_media.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
 
@@ -103,24 +101,13 @@ Future<RenderManifest> renderToSandbox({
   // Pre-resolve declared media before the first pump: the capture shell paints
   // images synchronously from the `ImageResolverScope`, so the decoded cache
   // must be warm before the tree mounts (a null resolver = a media-less render).
-  if (resolver != null) {
-    await generative.generateAll(
-      collectCompositionGenerative(composition),
-      onProgress: onGenerativeProgress,
-    );
-    await resolver.preResolveAll(collectCompositionMedia(composition, generative: generative));
-    final video = compositionVideo(composition);
-    final captionSource = video == null ? null : collectCaptionSource(video);
-    if (captionSource != null) {
-      await resolver.preResolveCaptions(captionSource);
-    }
-    await preResolveCompositionClips(
-      composition: composition,
-      resolver: resolver,
-      totalFrames: frameCount,
-      generative: generative,
-    );
-  }
+  await prepareCompositionMedia(
+    composition: composition,
+    totalFrames: frameCount,
+    resolver: resolver,
+    generative: generative,
+    onGenerativeProgress: onGenerativeProgress,
+  );
   final controller = RenderController();
   final boundaryKey = GlobalKey();
   final shell = buildCaptureShell(

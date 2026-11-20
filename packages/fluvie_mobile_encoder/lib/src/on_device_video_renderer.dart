@@ -2,6 +2,7 @@
 // linear capture, mix, and encode pipeline over injected seams, and the capture
 // half already lives in the on_device_video_renderer_capture.dart part.
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/fluvie.dart';
@@ -20,6 +21,7 @@ import 'package:fluvie_mobile_encoder/src/offscreen_capture_host.dart';
 import 'package:riverpod/riverpod.dart';
 
 part 'on_device_video_renderer_capture.dart';
+part 'on_device_video_renderer_still.dart';
 
 /// Builds the off-screen [CaptureHost] for a render at [size] logical pixels.
 typedef CaptureHostFactory = CaptureHost Function(Size size);
@@ -50,6 +52,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     CaptureHostFactory? hostFactory,
     SandboxFactory? sandboxFactory,
     RenderService? service,
+    FrameCaptureService? capture,
     MobileAudioMaterializer? audioMaterializer,
     void Function(String message)? onWarning,
     this.mediaResolver,
@@ -57,7 +60,9 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
   }) : _encoder = encoder ?? const MethodChannelMobileVideoEncoder(),
        _hostFactory = hostFactory ?? _defaultHostFactory,
        _sandboxFactory = sandboxFactory ?? _defaultSandboxFactory,
-       _service = service ?? RenderService(capture: const RepaintBoundaryCaptureService()),
+       _capture = capture ?? const RepaintBoundaryCaptureService(),
+       _service =
+           service ?? RenderService(capture: capture ?? const RepaintBoundaryCaptureService()),
        _audioMaterializer = audioMaterializer ?? BundleAudioMaterializer(),
        _onWarning = onWarning ?? _defaultWarn;
 
@@ -72,6 +77,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
   final MobileVideoEncoder _encoder;
   final CaptureHostFactory _hostFactory;
   final SandboxFactory _sandboxFactory;
+  final FrameCaptureService _capture;
   final RenderService _service;
   final MobileAudioMaterializer _audioMaterializer;
 
@@ -125,18 +131,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     // bypassed here because it is shared with the web encoder and cannot import
     // the io-only clip providers.
     final ownedContainer = mediaResolver == null
-        ? ProviderContainer(
-            overrides: [
-              frameExtractionServiceProvider.overrideWithValue(
-                const NativeFrameExtractionService(),
-              ),
-              videoProbeServiceProvider.overrideWithValue(
-                const NativeVideoProbeService(),
-              ),
-              if (networkAllowlist != null)
-                networkAllowlistProvider.overrideWithValue(networkAllowlist!),
-            ],
-          )
+        ? _createNativeMediaContainer(networkAllowlist)
         : null;
     final resolver = mediaResolver ?? ownedContainer!.read<MediaResolver>(mediaResolverProvider);
     try {
@@ -207,6 +202,62 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
         },
       ], (error, _) => _onWarning('Cleanup after render failed: $error'));
     }
+  }
+
+  /// Captures a single deterministic [RawFrame] of [composition] at [frame] or
+  /// [at] on-device without running the hardware video encoder or allocating a
+  /// temporary video sandbox.
+  ///
+  /// Useful for video covers, timeline previews, or single-image exports with
+  /// full RGBA transparency. Specify either [frame] or [at] (not both); omit
+  /// both for frame `0`. Set [stepThrough] to `true` when [composition]
+  /// contains stateful widgets whose output depends on visiting intermediate
+  /// frames `0..target`.
+  Future<RawFrame> captureFrame({
+    required Widget composition,
+    required Aspect aspect,
+    int? frame,
+    Duration? at,
+    int? fps,
+    int longEdge = VideoDefaults.longEdge,
+    bool stepThrough = false,
+  }) => _captureSingleFrameOnDevice(
+    composition: composition,
+    aspect: aspect,
+    frame: frame,
+    at: at,
+    fps: fps,
+    longEdge: longEdge,
+    stepThrough: stepThrough,
+    hostFactory: _hostFactory,
+    capture: _capture,
+    mediaResolver: mediaResolver,
+    networkAllowlist: networkAllowlist,
+    onWarning: _onWarning,
+  );
+
+  /// Captures a single deterministic PNG image (alpha preserved) of
+  /// [composition] at [frame] or [at] on-device, without invoking the video
+  /// encoder.
+  Future<Uint8List> capturePng({
+    required Widget composition,
+    required Aspect aspect,
+    int? frame,
+    Duration? at,
+    int? fps,
+    int longEdge = VideoDefaults.longEdge,
+    bool stepThrough = false,
+  }) async {
+    final raw = await captureFrame(
+      composition: composition,
+      aspect: aspect,
+      frame: frame,
+      at: at,
+      fps: fps,
+      longEdge: longEdge,
+      stepThrough: stepThrough,
+    );
+    return encodeRawFramePng(raw);
   }
 
   // coverage:ignore-line constructs the engine backed host exercised only on a device

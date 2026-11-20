@@ -154,6 +154,7 @@ Run Melos non-interactively (`CI=true`) to avoid the interactive-prompt path.
 - Human guides live in [`documentation/`](documentation/): `getting-started/`, `guides/`, `advanced/`, `reference/`, `contributing/`. **A new capability ships its guide in the same change.** Fork notes stay in [`docs/fork-maintenance.md`](docs/fork-maintenance.md) and [`docs/reuse.md`](docs/reuse.md).
 - Voice: short sentences, active voice, second person. **No em-dashes.** No marketing vocabulary (seamless, robust, leverage, powerful as filler, effortless, …). Lead with a runnable example. One page answers one question. End every page with `## Where to next`.
 - **Dart snippets are never hand-typed in docs**: they live in compiled, tested files under `examples/gallery/lib/` with `// #docregion` markers and flow into docs fences via `<!-- code-excerpt "<file> (<region>)" -->` directives (checked in CI).
+- The fork's still capture guide keeps its compiled example and test in the maintained mobile encoder package.
 - The gallery example app is **13 lessons** (`examples/gallery/lib/lessons/01_hello_video.dart` … `13_generative_content.dart`) plus the MVVM inspector. Each lesson: a short intro, one complete readable `Video`, a representative Alchemist golden, and a render-to-file action.
 
 ---
