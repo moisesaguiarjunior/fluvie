@@ -1,12 +1,13 @@
-// fluvie:large-file-ok: the canonical multi-aspect render entry; one public render() plus its private audio-mix helper
+// fluvie:large-file-ok: the canonical multi-aspect render entry; one public render() plus its private helpers
 import 'dart:io';
 
-import 'package:flutter/widgets.dart' show GlobalKey, Widget;
+import 'package:flutter/widgets.dart' show BuildContext, Element, GlobalKey, Widget;
 import 'package:fluvie/src/audio/encoding/audio_mix_staging.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/composition/runtime/audio_collector.dart';
 import 'package:fluvie/src/composition/runtime/clip_plan_collector.dart'
     show ClipAudioPlan, collectClipAudioPlans;
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/video.dart';
 import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
@@ -78,6 +79,11 @@ typedef RenderAspectResult = ({RenderManifest manifest, RenderConfig config});
 /// Each [aspect] re-derives its size from [longEdge] and renders independently,
 /// so the same [composition] renders the same frames for that aspect; the encode
 /// arg array, including the mix, is built from the plan.
+///
+/// [compositionKey] identifies the composition in the frame cache. The cache
+/// key also gains the active aspect and the seed of every video mounted on the
+/// initial pump. A video that first mounts on a later frame is absent from
+/// that list, so [compositionKey] has to include its seed.
 Future<RenderAspectResult> render({
   required Widget composition,
   required Aspect aspect,
@@ -163,12 +169,49 @@ Future<RenderAspectResult> render({
     compositionKey: frameCacheCompositionKey(
       compositionKey,
       aspectName: aspect.name,
-      seed: compositionVideo(composition)?.seed ?? 0,
+      // The initial pump is frame 0. Seeds joined here are the videos mounted
+      // now, in tree order. A video that first mounts on a later frame is not
+      // in this list; the caller-supplied compositionKey has to include it.
+      seeds: _cacheSeeds(boundaryKey.currentContext, composition),
     ),
     audioSources: audio.audioSources,
     stageAudio: audio.stageAudio,
   );
   return (manifest: manifest, config: config);
+}
+
+/// Seeds that distinguish [composition] in the frame cache.
+///
+/// Videos mounted on the initial pump win, in the order their scopes appear
+/// under the capture boundary. With none mounted, the key keeps the single
+/// seed [compositionVideo] can see, or zero. A video that first mounts on a
+/// later frame is absent; the caller-supplied composition key carries it.
+List<int> _cacheSeeds(BuildContext? boundary, Widget composition) {
+  final mounted = _mountedVideoSeeds(boundary);
+  if (mounted.isNotEmpty) return mounted;
+  return [compositionVideo(composition)?.seed ?? 0];
+}
+
+/// Seeds of the mounted videos under [boundary], in child order.
+///
+/// [compositionVideo] only sees a [Video] already present in the widget
+/// configuration. A `Builder` creates that video while the shell builds, and
+/// more than one video may mount, so the walk keeps going after the first
+/// scope. Each [FrameSceneScope] that carries a composition size is a video.
+/// The capture shell's own scope has no composition size and is skipped.
+List<int> _mountedVideoSeeds(BuildContext? boundary) {
+  if (boundary is! Element) return const [];
+  final seeds = <int>[];
+  void visit(Element element) {
+    final widget = element.widget;
+    if (widget is FrameSceneScope && widget.compositionSize != null) {
+      seeds.add(widget.seed);
+    }
+    element.visitChildren(visit);
+  }
+
+  boundary.visitChildElements(visit);
+  return seeds;
 }
 
 /// Resolves the encoder audio mix for [composition]: an explicit

@@ -353,7 +353,7 @@ Future<RenderManifest> renderVideo({
         Aspect.fallback;
     final cacheKey = frameCacheCompositionKey(
       compositionKey,
-      seed: video.seed,
+      seeds: [video.seed],
       aspectName: activeAspect.name,
     );
     final counting = _CountingCaptureService(capture);
@@ -450,8 +450,9 @@ Future<SnapshotCaptureScope?> _captureSnapshotScope({
   }
   Future<void> pump(GlobalKey boundaryKey, Widget child) async {
     setViewSize(width, height);
-    // The child is pumped outside the Video, and Snapshot freezes this raster,
-    // so the capture seed, canvas, and aspect have to be present on this pass.
+    // The child is pumped outside the Video, and Snapshot freezes this raster.
+    // The capture seed, canvas, and aspect have to be present. The frame clock
+    // stays absent: a time here would bake one instant into every frame.
     Widget scene = FrameSceneScope(
       captureSize: Size(width.toDouble(), height.toDouble()),
       compositionSize: Size(compositionWidth.toDouble(), compositionHeight.toDouble()),

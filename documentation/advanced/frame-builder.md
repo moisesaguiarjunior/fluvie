@@ -38,8 +38,10 @@ rest of Fluvie reads. The values:
 - `ctx.seed` is the integer supplied to `Video(seed: ...)` and defaults to
   zero. Pass it to a painter or material cache to keep the same recipe across
   renders. A `Snapshot` child is rasterized once, outside the video widget.
-  `renderVideo` still supplies that pass with the capture canvas, the active
-  aspect, and `Video.seed`, so the frozen image matches the capture.
+  `renderVideo` supplies that pass with the capture canvas, the active aspect,
+  and `Video.seed`, so the frozen image matches the capture. The frame clock
+  is not mounted there. Reading `ctx.time`, `ctx.frame`, `ctx.fps`,
+  `ctx.scope`, or `ctx.progress` throws `FluvieTimingError`.
 - `ctx.progress` is `0..1` across this element's resolved window.
 - `ctx.fps` is the frames per second of the enclosing scope.
 - `ctx.scope` is the enclosing time scope, with its start frame and length.

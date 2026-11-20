@@ -18,6 +18,7 @@ import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/composition/scene.dart';
 import 'package:fluvie/src/composition/video.dart';
 import 'package:fluvie/src/core/aspect.dart';
+import 'package:fluvie/src/core/errors/fluvie_timing_error.dart';
 import 'package:fluvie/src/core/time_extensions.dart';
 import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/snapshot.dart';
@@ -202,6 +203,29 @@ void main() {
       expect(size, const Size.square(32));
       expect((r.manifest.width, r.manifest.height), (32, 32));
       expect(r.frames.sublist(0, 4), const [0x11, 0x22, 0x33, 0xFF]);
+    });
+
+    testWidgets('a Snapshot child cannot read the frame clock', (tester) async {
+      final video = Video(
+        size: const VideoSize(16, 16),
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: Snapshot(
+                  child: FrameBuilder((ctx) {
+                    ctx.time;
+                    return const ColoredBox(color: Color(0xFF112233), child: SizedBox.expand());
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+      await _render(tester, video: video, frameCountOverride: 1);
+      expect(tester.takeException(), isA<FluvieTimingError>());
     });
   });
 
