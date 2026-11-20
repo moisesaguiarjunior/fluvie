@@ -114,6 +114,7 @@ Future<RenderManifest> renderToSandbox({
     composition: AspectScope(aspect: aspect, child: composition),
     boundaryKey: boundaryKey,
     controller: controller,
+    canvasSize: size,
     resolver: resolver,
     generativeResolver: generative,
   );

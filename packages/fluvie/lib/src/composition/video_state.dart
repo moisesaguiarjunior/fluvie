@@ -92,25 +92,30 @@ final class VideoState extends State<Video> {
       }
     }
     final offsets = widget._offsets;
-    return VideoScope(
-      fps: widget.fps,
-      duration: Time.frames(offsets.totalFrames),
-      // The compositor is the only frame reader of the shell: it gates and
-      // blends every scene in one shared expanding Stack from the same offset
-      // math the getters use. The caption layer sits on top.
-      child: _withCaptions(
-        TransitionCompositor(
-          offsets: offsets,
-          transitions: widget._boundaryTransitions,
-          sharedElements: _sharedElements,
-          sceneShells: [
-            for (var s = 0; s < widget.scenes.length; s++)
-              _sceneShell(
-                widget.scenes[s],
-                sceneIndex: s,
-                startFrame: offsets.startFrames[s],
-              ),
-          ],
+    return FrameSceneScope(
+      captureSize: FrameSceneScope.maybeOf(context)?.captureSize,
+      compositionSize: Size(widget.width.toDouble(), widget.height.toDouble()),
+      seed: widget.seed,
+      child: VideoScope(
+        fps: widget.fps,
+        duration: Time.frames(offsets.totalFrames),
+        // The compositor is the only frame reader of the shell: it gates and
+        // blends every scene in one shared expanding Stack from the same offset
+        // math the getters use. The caption layer sits on top.
+        child: _withCaptions(
+          TransitionCompositor(
+            offsets: offsets,
+            transitions: widget._boundaryTransitions,
+            sharedElements: _sharedElements,
+            sceneShells: [
+              for (var s = 0; s < widget.scenes.length; s++)
+                _sceneShell(
+                  widget.scenes[s],
+                  sceneIndex: s,
+                  startFrame: offsets.startFrames[s],
+                ),
+            ],
+          ),
         ),
       ),
     );

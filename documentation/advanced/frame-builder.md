@@ -30,6 +30,16 @@ The `ctx` your builder receives reads the render state from the same scopes the
 rest of Fluvie reads. The values:
 
 - `ctx.frame` is the absolute video frame this build is for.
+- `ctx.time` is the elapsed `Duration` from video frame zero. It rounds up to
+  the next whole microsecond when the frame starts between microseconds.
+- `ctx.size` is the output canvas size in capture and the video's declared
+  canvas size in preview. An element can still lay out within a smaller area.
+- `ctx.aspect` is the active layout variant, matching `AspectScope.of`.
+- `ctx.seed` is the integer supplied to `Video(seed: ...)` and defaults to
+  zero. Pass it to a painter or material cache to keep the same recipe across
+  renders. A `Snapshot` child is rasterized once, outside the video widget.
+  `renderVideo` still supplies that pass with the capture canvas, the active
+  aspect, and `Video.seed`, so the frozen image matches the capture.
 - `ctx.progress` is `0..1` across this element's resolved window.
 - `ctx.fps` is the frames per second of the enclosing scope.
 - `ctx.scope` is the enclosing time scope, with its start frame and length.
@@ -40,6 +50,11 @@ rest of Fluvie reads. The values:
 `progress` is the value most builders want. It runs from 0 at the start of the
 element's window to 1 at the end, so a builder reads as an animation without a
 curve or a tween.
+
+For capture at 30 fps, frame 1 starts at 33,333 and one third microseconds.
+`ctx.time` returns 33,334 microseconds, so passing it to single-frame capture
+selects frame 1. Use `ctx.frame` when the frame interval is shorter than a
+microsecond.
 
 ## Reading noise and audio
 

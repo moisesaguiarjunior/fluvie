@@ -15,6 +15,20 @@ Fork pre-release. Not published to pub.dev.
 
 ## [Unreleased]
 
+### Added
+
+- `FrameContext` exposes `time`, `size`, `aspect`, and `seed`. `Video(seed:)`
+  carries the seed. Capture reports the output canvas; a preview reports the
+  video's declared size.
+
+### Fixed
+
+- `renderVideo` gives a `Snapshot` child the capture seed, canvas, and aspect
+  before rasterizing it, so those values stay in the frozen image.
+- The frame-cache key for `renderVideo` and `render` includes `Video.seed` and
+  the active aspect. Each variant gets its own cached frames even at the same
+  canvas size.
+
 ## [0.3.1+socialstudio.1] - 2026-11-12
 
 Fork pre-release. Not published to pub.dev. Build metadata keeps a

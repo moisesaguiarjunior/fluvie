@@ -124,6 +124,7 @@ Future<RawFrame> captureFrame({
     composition: AspectScope(aspect: aspect, child: composition),
     boundaryKey: boundaryKey,
     controller: controller,
+    canvasSize: size,
     resolver: resolver,
     generativeResolver: generative,
   );

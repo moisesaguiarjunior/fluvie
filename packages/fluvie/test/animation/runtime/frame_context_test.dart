@@ -9,12 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/src/animation/runtime/frame_context.dart';
 import 'package:fluvie/src/animation/runtime/noise_scope.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope.dart';
+import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/core/anchor.dart';
+import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/audio/band_table.dart';
 import 'package:fluvie/src/core/audio_band.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/noise/noise_source.dart';
 import 'package:fluvie/src/core/noise/value_noise.dart';
+import 'package:fluvie/src/rendering/render_frame.dart';
 import 'package:fluvie/src/rendering/runtime/frame_provider.dart';
 import 'package:fluvie/src/rendering/runtime/render_mode.dart';
 import 'package:fluvie/src/rendering/runtime/render_mode_context.dart';
@@ -52,6 +56,10 @@ Future<void> _pump(
   Map<Anchor, BandTable> tracks = const {},
   NoiseSource? noise,
   RenderMode mode = RenderMode.preview,
+  Size? captureSize,
+  Size? compositionSize,
+  int? sceneSeed,
+  Aspect? aspect,
 }) async {
   Widget reader = Builder(
     builder: (context) {
@@ -73,6 +81,17 @@ Future<void> _pump(
     mode: mode,
     child: Directionality(textDirection: TextDirection.ltr, child: reader),
   );
+  if (aspect != null) {
+    reader = AspectScope(aspect: aspect, child: reader);
+  }
+  if (captureSize != null || compositionSize != null || sceneSeed != null) {
+    reader = FrameSceneScope(
+      captureSize: captureSize,
+      compositionSize: compositionSize,
+      seed: sceneSeed ?? 0,
+      child: reader,
+    );
+  }
   await tester.pumpWidget(reader);
 }
 
@@ -103,6 +122,123 @@ void main() {
       );
       expect(scope.startFrame, 12);
       expect(scope.durationFrames, 48);
+    });
+
+    testWidgets('frame zero is Duration.zero', (tester) async {
+      late Duration time;
+      await _pump(tester, body: (ctx) => time = ctx.time);
+      expect(time, Duration.zero);
+    });
+
+    testWidgets('frame 1 at 30 fps rounds up and indexes back to that frame', (tester) async {
+      late Duration time;
+      await _pump(tester, frame: 1, body: (ctx) => time = ctx.time);
+      expect(time, const Duration(microseconds: 33334));
+      expect(frameIndexFor(time), 1);
+    });
+
+    testWidgets('one microsecond per frame still round-trips', (tester) async {
+      late Duration time;
+      await _pump(
+        tester,
+        frame: 3,
+        scope: const TimeScopeData(fps: 1000000, startFrame: 0, durationFrames: 8),
+        body: (ctx) => time = ctx.time,
+      );
+      expect(time, const Duration(microseconds: 3));
+      expect(frameIndexFor(time, fps: 1000000), 3);
+    });
+
+    testWidgets('a frame shorter than a microsecond does not round-trip', (tester) async {
+      late Duration time;
+      await _pump(
+        tester,
+        frame: 1,
+        scope: const TimeScopeData(fps: 2000000, startFrame: 0, durationFrames: 4),
+        body: (ctx) => time = ctx.time,
+      );
+      expect(time, const Duration(microseconds: 1));
+      expect(frameIndexFor(time, fps: 2000000), 2);
+    });
+
+    testWidgets('a non-positive fps is rejected', (tester) async {
+      late FrameContext ctx;
+      await _pump(
+        tester,
+        scope: const TimeScopeData(fps: 0, startFrame: 0, durationFrames: 1),
+        body: (value) => ctx = value,
+      );
+      expect(() => ctx.time, throwsArgumentError);
+    });
+
+    testWidgets('a time that cannot fit in a Duration is rejected', (tester) async {
+      late FrameContext ctx;
+      await _pump(tester, frame: 1 << 62, body: (value) => ctx = value);
+      expect(() => ctx.time, throwsRangeError);
+    });
+  });
+
+  group('FrameContext — canvas, aspect, and seed', () {
+    testWidgets('without a scene scope, size follows the view and seed is zero', (tester) async {
+      tester.view
+        ..physicalSize = const Size(640, 480)
+        ..devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view
+          ..resetPhysicalSize()
+          ..resetDevicePixelRatio();
+      });
+      late Size size;
+      late Aspect aspect;
+      late int seed;
+      await _pump(
+        tester,
+        body: (ctx) {
+          size = ctx.size;
+          aspect = ctx.aspect;
+          seed = ctx.seed;
+        },
+      );
+      expect(size, const Size(640, 480));
+      expect(aspect, Aspect.fallback);
+      expect(seed, 0);
+    });
+
+    testWidgets('capture size and the declared seed win over the authored canvas', (tester) async {
+      late Size size;
+      late Aspect aspect;
+      late int seed;
+      await _pump(
+        tester,
+        captureSize: const Size(10, 20),
+        compositionSize: const Size(30, 40),
+        sceneSeed: -3,
+        aspect: Aspect.square,
+        body: (ctx) {
+          size = ctx.size;
+          aspect = ctx.aspect;
+          seed = ctx.seed;
+        },
+      );
+      expect(size, const Size(10, 20));
+      expect(aspect, Aspect.square);
+      expect(seed, -3);
+    });
+
+    testWidgets('preview size is the authored canvas when nothing is capturing', (tester) async {
+      late Size size;
+      late int seed;
+      await _pump(
+        tester,
+        compositionSize: const Size(30, 40),
+        sceneSeed: 7,
+        body: (ctx) {
+          size = ctx.size;
+          seed = ctx.seed;
+        },
+      );
+      expect(size, const Size(30, 40));
+      expect(seed, 7);
     });
   });
 

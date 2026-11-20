@@ -5,6 +5,7 @@ import 'package:fluvie/src/captions/runtime/captions_layer.dart';
 import 'package:fluvie/src/composition/camera/camera.dart';
 import 'package:fluvie/src/composition/camera/camera_layer.dart';
 import 'package:fluvie/src/composition/runtime/composition_preparation_scope.dart';
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/runtime/timeline_probe.dart';
 import 'package:fluvie/src/composition/runtime/transition_compositor.dart';
 import 'package:fluvie/src/composition/runtime/video_plan_builder.dart';
@@ -58,7 +59,7 @@ part 'video_state.dart';
 /// audio pipeline and [export] by the export dispatch.
 final class Video extends StatefulWidget {
   /// Creates a video of [scenes] on a [size] (or [width] × [height]) canvas
-  /// at [fps].
+  /// at [fps]. [seed] reaches frame builders in this video.
   ///
   /// [scenes] must not be empty — they define the video's duration — and an
   /// explicit [size] preset always wins over the loose dimensions.
@@ -68,6 +69,7 @@ final class Video extends StatefulWidget {
     int width = 1080,
     int height = 1920,
     this.fps = VideoDefaults.fps,
+    this.seed = 0,
     this.motionDefaults,
     this.transition,
     this.audio = const [],
@@ -100,6 +102,9 @@ final class Video extends StatefulWidget {
 
   /// Frames per second of the whole composition.
   final int fps;
+
+  /// Deterministic seed available to frame builders in this video.
+  final int seed;
 
   /// Video-level animation defaults — the bottom of the user cascade;
   /// `null` falls through to the package defaults.

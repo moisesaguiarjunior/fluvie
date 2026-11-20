@@ -13,6 +13,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart' hide Image;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluvie/src/animation/frame_builder.dart';
 import 'package:fluvie/src/audio/audio.dart';
 import 'package:fluvie/src/composition/adaptive.dart';
 import 'package:fluvie/src/composition/scene.dart';
@@ -25,6 +26,7 @@ import 'package:fluvie/src/core/time_extensions.dart';
 import 'package:fluvie/src/core/trigger.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/capture/repaint_boundary_capture_service.dart';
+import 'package:fluvie/src/rendering/encoding/frame_cache.dart';
 import 'package:fluvie/src/rendering/no_media_resolver.dart';
 import 'package:fluvie/src/rendering/render_aspect.dart';
 import 'package:fluvie/src/rendering/render_service.dart';
@@ -172,6 +174,69 @@ void main() {
         resolver: resolver(),
       );
       expect(a.ffmpegArgs, b.ffmpegArgs);
+    });
+  });
+
+  group('frame cache', () {
+    testWidgets('a different seed does not replay cached frames', (tester) async {
+      final dir = Directory.systemTemp.createTempSync('fluvie_render_aspect_seed_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final cacheRoot = Directory.systemTemp.createTempSync('fluvie_render_aspect_seed_cache_');
+      addTearDown(() => cacheRoot.deleteSync(recursive: true));
+      tester.view.physicalSize = const ui.Size(16, 16);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final service = RenderService(
+        capture: const RepaintBoundaryCaptureService(),
+        cache: FrameCache(cacheRoot),
+      );
+
+      Video seeded(int seed) => Video(
+        width: 16,
+        height: 16,
+        seed: seed,
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: FrameBuilder(
+                  (ctx) => ColoredBox(
+                    color: Color(0xFF000000 + ctx.seed),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      Future<Uint8List> once(int seed) async {
+        await tester.runAsync(() async {
+          await render(
+            composition: seeded(seed),
+            aspect: Aspect.square,
+            longEdge: 16,
+            frameCount: 1,
+            outDir: dir,
+            service: service,
+            cacheEnabled: true,
+            compositionKey: 'same',
+            pumpWidget: tester.pumpWidget,
+            pumpFrame: () => tester.pump(),
+          );
+        });
+        return File('${dir.path}/frames.rgba').readAsBytesSync();
+      }
+
+      final first = await once(1);
+      final second = await once(2);
+      final again = await once(1);
+      expect(first.sublist(0, 4), const [0x00, 0x00, 0x01, 0xFF]);
+      expect(second.sublist(0, 4), const [0x00, 0x00, 0x02, 0xFF]);
+      expect(again, first);
     });
   });
 }

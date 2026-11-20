@@ -12,6 +12,7 @@ import 'package:fluvie/src/composition/runtime/audio_collector.dart';
 import 'package:fluvie/src/composition/runtime/caption_collector.dart';
 import 'package:fluvie/src/composition/runtime/clip_plan_collector.dart'
     show ClipAudioPlan, collectClipAudioPlans;
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/runtime/media_collector.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
 import 'package:fluvie/src/composition/scene.dart';
@@ -26,6 +27,7 @@ import 'package:fluvie/src/core/contracts/snapshot_service.dart';
 import 'package:fluvie/src/core/export.dart';
 import 'package:fluvie/src/core/quality.dart';
 import 'package:fluvie/src/core/time.dart';
+import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture_scope.dart';
 import 'package:fluvie/src/media/render_resolver_scope.dart';
@@ -36,6 +38,7 @@ import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/capture/repaint_boundary_capture_service.dart';
 import 'package:fluvie/src/rendering/clip_audio_staging.dart';
+import 'package:fluvie/src/rendering/encoding/content_hash.dart';
 import 'package:fluvie/src/rendering/encoding/frame_cache.dart';
 import 'package:fluvie/src/rendering/no_media_resolver.dart';
 import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
@@ -292,6 +295,10 @@ Future<RenderManifest> renderVideo({
         resolver: active,
         width: width,
         height: height,
+        compositionWidth: video.width,
+        compositionHeight: video.height,
+        seed: video.seed,
+        aspect: aspect,
         pumpWidget: pumpWidget,
         setViewSize: setViewSize,
       );
@@ -321,6 +328,7 @@ Future<RenderManifest> renderVideo({
       composition: composition,
       boundaryKey: boundaryKey,
       controller: controller,
+      canvasSize: VideoSize(width, height),
       resolver: active,
       snapshotScope: snapshotScope,
       reactiveTracks: active == null ? noReactiveTracks : reactiveTracks,
@@ -339,6 +347,15 @@ Future<RenderManifest> renderVideo({
     });
     await pumpWidget(shell.tree);
 
+    final activeAspect =
+        aspect ??
+        boundaryKey.currentContext?.getInheritedWidgetOfExactType<AspectScope>()?.aspect ??
+        Aspect.fallback;
+    final cacheKey = frameCacheCompositionKey(
+      compositionKey,
+      seed: video.seed,
+      aspectName: activeAspect.name,
+    );
     final counting = _CountingCaptureService(capture);
     // The resolver is what serves media during the loop AND what the audio mix
     // stages through, so the service is built here, after it exists — its `media`
@@ -369,7 +386,8 @@ Future<RenderManifest> renderVideo({
           await pumpFrame();
         },
         boundaryKey: boundaryKey,
-        compositionKey: compositionKey,
+        // The two render entry points can share a cache directory.
+        compositionKey: '$cacheKey-renderVideo',
         audioSources: audio.audioSources,
         stageAudio: audio.stageAudio,
         export: export,
@@ -399,14 +417,22 @@ Future<RenderManifest> renderVideo({
 /// Rasterizes every `Snapshot` in [scenes] once and returns the scope holding the
 /// stills, or `null` when there are none.
 ///
-/// The wrapper (`RepaintBoundary` > `SizedBox` > `ImageResolverScope` >
-/// `Directionality`) is built here so `SnapshotCaptureScope` never crosses the
-/// public barrel; the host contributes only its pump and view seams.
+/// The wrapper (`Directionality` > `ImageResolverScope` > `RepaintBoundary` >
+/// `SizedBox` > scene scopes) is built here so `SnapshotCaptureScope` never
+/// crosses the public barrel; the host contributes only its pump and view seams.
+///
+/// [width] and [height] are the capture canvas. [compositionWidth] and
+/// [compositionHeight] are the size declared on the video. [seed] and [aspect]
+/// are the capture's, because this child is pumped outside the [Video].
 Future<SnapshotCaptureScope?> _captureSnapshotScope({
   required List<Scene> scenes,
   required MediaResolver? resolver,
   required int width,
   required int height,
+  required int compositionWidth,
+  required int compositionHeight,
+  required int seed,
+  required Aspect? aspect,
   required ShellMount pumpWidget,
   required SetViewSize setViewSize,
 }) async {
@@ -424,9 +450,18 @@ Future<SnapshotCaptureScope?> _captureSnapshotScope({
   }
   Future<void> pump(GlobalKey boundaryKey, Widget child) async {
     setViewSize(width, height);
+    // The child is pumped outside the Video, and Snapshot freezes this raster,
+    // so the capture seed, canvas, and aspect have to be present on this pass.
+    Widget scene = FrameSceneScope(
+      captureSize: Size(width.toDouble(), height.toDouble()),
+      compositionSize: Size(compositionWidth.toDouble(), compositionHeight.toDouble()),
+      seed: seed,
+      child: child,
+    );
+    if (aspect != null) scene = AspectScope(aspect: aspect, child: scene);
     Widget boundary = RepaintBoundary(
       key: boundaryKey,
-      child: SizedBox(width: width.toDouble(), height: height.toDouble(), child: child),
+      child: SizedBox(width: width.toDouble(), height: height.toDouble(), child: scene),
     );
     if (resolver != null) {
       boundary = ImageResolverScope(resolver: resolver, child: boundary);

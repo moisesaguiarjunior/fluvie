@@ -1,10 +1,13 @@
 /// @docImport 'package:fluvie/src/core/audio/band_table.dart';
 library;
 
-import 'package:flutter/widgets.dart' show BuildContext;
+import 'package:flutter/widgets.dart' show BuildContext, MediaQuery, Size;
 import 'package:fluvie/src/animation/runtime/noise_scope.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope.dart';
+import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/core/anchor.dart';
+import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/audio_band.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/rendering/runtime/frame_provider.dart';
@@ -14,8 +17,8 @@ import 'package:fluvie/src/timing/time_scope_provider.dart';
 import 'package:meta/meta.dart';
 
 /// The resolved render state a `FrameBuilder` paints from: the
-/// current frame, its progress across the element window, the fps and scope,
-/// the seeded noise source, and the analysed audio bands.
+/// frame clock and element window, canvas and aspect, deterministic seed and
+/// noise source, and the analysed audio bands.
 ///
 /// Every value is read from the same scopes the rest of Fluvie reads — the
 /// [FrameProvider] clock, the enclosing [TimeScopeData], the [NoiseScope],
@@ -43,6 +46,43 @@ final class FrameContext {
 
   /// The frames-per-second of the enclosing scope.
   int get fps => scope.fps;
+
+  /// Elapsed time from frame zero. Rounds up to the first whole microsecond
+  /// at or after the frame's start, so indexing that instant at [fps] selects
+  /// this frame when the frame lasts at least one microsecond.
+  ///
+  /// A faster clock can share one [Duration] across frames. Read [frame] then.
+  /// Throws an [ArgumentError] when [fps] is not positive, and a [RangeError]
+  /// when the result cannot fit in a [Duration].
+  Duration get time {
+    if (fps <= 0) {
+      throw ArgumentError.value(fps, 'fps', 'must be positive');
+    }
+    final numerator = BigInt.from(frame) * BigInt.from(Duration.microsecondsPerSecond);
+    final divisor = BigInt.from(fps);
+    final microseconds = (numerator + divisor - BigInt.one) ~/ divisor;
+    if (!microseconds.isValidInt) {
+      throw RangeError('The time of frame $frame at $fps fps is too large.');
+    }
+    return Duration(microseconds: microseconds.toInt());
+  }
+
+  /// The capture canvas in pixels, or the enclosing video's authored size in
+  /// preview. A standalone builder uses the inherited view size if available.
+  Size get size {
+    final scene = FrameSceneScope.maybeOf(_context);
+    return scene?.captureSize ??
+        scene?.compositionSize ??
+        MediaQuery.maybeSizeOf(_context) ??
+        Size.zero;
+  }
+
+  /// The active layout variant, using the same fallback as [AspectScope].
+  Aspect get aspect => AspectScope.of(_context);
+
+  /// The seed declared on the enclosing video, or zero for a standalone
+  /// builder. Use it to seed your own materials and painters.
+  int get seed => FrameSceneScope.maybeOf(_context)?.seed ?? 0;
 
   /// Progress `0..1` across this element's resolved window: the frames elapsed
   /// since the scope began over its `durationFrames`, clamped. A zero-length

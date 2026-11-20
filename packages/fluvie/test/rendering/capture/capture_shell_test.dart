@@ -10,7 +10,8 @@
 //           > RepaintBoundary(boundaryKey)
 //             > [ReactiveScope when reactive tracks]
 //               > [BeatGridScope when beat grids]
-//                 > composition
+//                 > [FrameSceneScope when canvasSize is supplied]
+//                   > composition
 //
 // The shell bakes neither flutter_test nor ffmpeg in: it is a pure widget-tree
 // builder, parameterized by the injected pre-pass results.
@@ -20,12 +21,14 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope.dart';
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
 import 'package:fluvie/src/core/anchor.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/audio/band_table.dart';
 import 'package:fluvie/src/core/audio_band.dart';
 import 'package:fluvie/src/core/contracts/beat_grid.dart';
+import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture_scope.dart';
 import 'package:fluvie/src/media/runtime/image_resolver_scope.dart';
 import 'package:fluvie/src/rendering/capture/beat_grid_scope.dart';
@@ -254,6 +257,32 @@ void main() {
         controller: RenderController(),
       );
       expect(shell.mountedSnapshotScope, isNull);
+    });
+
+    testWidgets('omits the scene scope until a canvas size is supplied', (tester) async {
+      final shell = buildCaptureShell(
+        composition: const SizedBox(key: _kLeaf),
+        boundaryKey: GlobalKey(),
+        controller: RenderController(),
+      );
+      await tester.pumpWidget(shell.tree);
+      expect(find.byType(FrameSceneScope), findsNothing);
+    });
+
+    testWidgets('a canvas size is the capture size under the composition', (tester) async {
+      final shell = buildCaptureShell(
+        composition: const SizedBox(key: _kLeaf),
+        boundaryKey: GlobalKey(),
+        controller: RenderController(),
+        canvasSize: const VideoSize(96, 160),
+      );
+      await tester.pumpWidget(shell.tree);
+      final scope = tester.widget<FrameSceneScope>(find.byType(FrameSceneScope));
+      expect(scope.captureSize, const Size(96, 160));
+      expect(
+        _depthOf(tester, find.byType(FrameSceneScope)),
+        lessThan(_depthOf(tester, find.byKey(_kLeaf))),
+      );
     });
   });
 }

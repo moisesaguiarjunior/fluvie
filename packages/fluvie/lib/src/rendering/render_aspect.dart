@@ -18,6 +18,8 @@ import 'package:fluvie/src/core/defaults.dart';
 import 'package:fluvie/src/rendering/capture/capture_shell.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/clip_audio_staging.dart';
+import 'package:fluvie/src/rendering/collect_composition_media.dart';
+import 'package:fluvie/src/rendering/encoding/content_hash.dart';
 import 'package:fluvie/src/rendering/no_generative_resolver.dart';
 import 'package:fluvie/src/rendering/prepare_composition_media.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
@@ -132,6 +134,7 @@ Future<RenderAspectResult> render({
     composition: AspectScope(aspect: aspect, child: composition),
     boundaryKey: boundaryKey,
     controller: controller,
+    canvasSize: size,
     resolver: resolver,
     generativeResolver: generative,
   );
@@ -157,7 +160,11 @@ Future<RenderAspectResult> render({
       await pumpFrame();
     },
     boundaryKey: boundaryKey,
-    compositionKey: '$compositionKey-${aspect.name}',
+    compositionKey: frameCacheCompositionKey(
+      compositionKey,
+      aspectName: aspect.name,
+      seed: compositionVideo(composition)?.seed ?? 0,
+    ),
     audioSources: audio.audioSources,
     stageAudio: audio.stageAudio,
   );

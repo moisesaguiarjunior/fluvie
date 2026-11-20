@@ -1,11 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope_builder.dart';
+import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
 import 'package:fluvie/src/core/anchor.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/contracts/beat_grid.dart';
 import 'package:fluvie/src/core/contracts/generative_resolver.dart';
 import 'package:fluvie/src/core/contracts/media_resolver.dart';
+import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture_scope.dart';
 import 'package:fluvie/src/media/runtime/generative_resolver_scope.dart';
 import 'package:fluvie/src/media/runtime/image_resolver_scope.dart';
@@ -41,6 +43,7 @@ typedef CaptureShell = ({Widget tree, SnapshotCaptureScope? mountedSnapshotScope
 /// The shell is parameterized by the injected pre-pass results: the media
 /// [resolver] (pre-resolved before frame 0), the [snapshotScope] the snapshot
 /// pre-pass rasterized, and the [reactiveTracks] the reactive pre-pass analysed.
+/// [canvasSize] exposes the dimensions chosen by the capture entry point.
 /// It mounts each conditional scope only when it has something to carry, in this
 /// exact depth order:
 ///
@@ -52,7 +55,8 @@ typedef CaptureShell = ({Widget tree, SnapshotCaptureScope? mountedSnapshotScope
 ///         > RepaintBoundary(boundaryKey)
 ///           > [ReactiveScope   when reactiveTracks has a default source]
 ///             > [BeatGridScope when the resolver has any beat grid]
-///               > composition
+///               > [FrameSceneScope when canvasSize is supplied]
+///                 > composition
 /// ```
 ///
 /// The `RenderModeContext` is outermost (mounted in `RenderMode.capture`) so the
@@ -68,6 +72,7 @@ CaptureShell buildCaptureShell({
   required Widget composition,
   required GlobalKey boundaryKey,
   required RenderController controller,
+  VideoSize? canvasSize,
   MediaResolver? resolver,
   GenerativeResolver? generativeResolver,
   SnapshotCaptureScope? snapshotScope,
@@ -75,6 +80,12 @@ CaptureShell buildCaptureShell({
 }) {
   // Innermost out: the composition wrapped in the per-frame audio scopes.
   var inner = composition;
+  if (canvasSize != null) {
+    inner = FrameSceneScope(
+      captureSize: Size(canvasSize.width.toDouble(), canvasSize.height.toDouble()),
+      child: inner,
+    );
+  }
   if (resolver != null) {
     inner = _beatGridScopeFor(reactiveTracks, resolver, inner);
     inner = reactiveScopeFor(reactiveTracks, resolver, inner);

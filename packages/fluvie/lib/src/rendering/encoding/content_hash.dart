@@ -33,3 +33,17 @@ String renderDigest({
     }),
   ),
 );
+
+/// Composition key stored in a frame-cache digest.
+///
+/// [seed] is always part of the key, including zero, so pixels cached for one
+/// `Video.seed` are not replayed for another. Pass the active [aspectName]
+/// to distinguish layout variants that share the same canvas size.
+String frameCacheCompositionKey(
+  String compositionKey, {
+  required int seed,
+  String? aspectName,
+}) {
+  final aspect = aspectName == null ? '' : '-$aspectName';
+  return '$compositionKey$aspect-seed-$seed';
+}
