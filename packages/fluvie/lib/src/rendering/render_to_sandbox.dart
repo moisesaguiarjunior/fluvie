@@ -22,6 +22,7 @@ import 'package:fluvie/src/rendering/io/render_sandbox.dart';
 import 'package:fluvie/src/rendering/no_generative_resolver.dart';
 import 'package:fluvie/src/rendering/prepare_composition_media.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
+import 'package:fluvie/src/rendering/render_metrics.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
 
 /// Mounts a capture shell ([Widget]) into the host before the frame loop.
@@ -48,7 +49,11 @@ typedef FrameEncoder = Future<Uint8List> Function(Uint8List rgba, int width, int
 /// into [sandbox]'s frames file, then writes `manifest.json` there. The caller
 /// (the web encoder) reads [sandbox] to feed ffmpeg.wasm and returns the encoded
 /// bytes. Rendering the same composition produces the same frames, the same as
-/// the file path.
+/// the file path. Pass [metrics] to record preparation, mounting, pumping, and
+/// readback. When [frameEncoder] writes a PNG, each frame adds one encoding
+/// sample around that encode and its sandbox write. This path has no frame
+/// cache, so cache counters stay at zero. Omit [metrics] and the render
+/// allocates no timing state.
 ///
 /// Pass [audioTracks] (resolved by `resolveAudioMix`) plus a [loadAudioBytes]
 /// loader to mix audio: each track is staged into [sandbox] by
@@ -83,6 +88,7 @@ Future<RenderManifest> renderToSandbox({
   GenerativeResolver generative = const NoGenerativeResolver(),
   void Function(GenerativeProgress progress)? onGenerativeProgress,
   FrameEncoder? frameEncoder,
+  RenderMetrics? metrics,
 }) async {
   if (audioTracks.isNotEmpty && loadAudioBytes == null) {
     throw ArgumentError.value(
@@ -101,13 +107,21 @@ Future<RenderManifest> renderToSandbox({
   // Pre-resolve declared media before the first pump: the capture shell paints
   // images synchronously from the `ImageResolverScope`, so the decoded cache
   // must be warm before the tree mounts (a null resolver = a media-less render).
-  await prepareCompositionMedia(
-    composition: composition,
-    totalFrames: frameCount,
-    resolver: resolver,
-    generative: generative,
-    onGenerativeProgress: onGenerativeProgress,
-  );
+  final mediaWatch = metrics == null ? null : (Stopwatch()..start());
+  try {
+    await prepareCompositionMedia(
+      composition: composition,
+      totalFrames: frameCount,
+      resolver: resolver,
+      generative: generative,
+      onGenerativeProgress: onGenerativeProgress,
+    );
+  } finally {
+    if (mediaWatch != null) {
+      mediaWatch.stop();
+      metrics!.addPreparation(mediaWatch.elapsed);
+    }
+  }
   final controller = RenderController();
   final boundaryKey = GlobalKey();
   final shell = buildCaptureShell(
@@ -118,7 +132,15 @@ Future<RenderManifest> renderToSandbox({
     resolver: resolver,
     generativeResolver: generative,
   );
-  await pumpWidget(shell.tree);
+  final mountWatch = metrics == null ? null : (Stopwatch()..start());
+  try {
+    await pumpWidget(shell.tree);
+  } finally {
+    if (mountWatch != null) {
+      mountWatch.stop();
+      metrics!.addMounting(mountWatch.elapsed);
+    }
+  }
 
   final digest = renderDigest(
     config: config,
@@ -128,13 +150,14 @@ Future<RenderManifest> renderToSandbox({
   await sandbox.create();
   // The browser path (frameEncoder set) writes one bounded-size PNG per frame as
   // it is captured; every other backend appends raw RGBA to one frames stream.
-  final framesArePng = frameEncoder != null;
+  final encodeFrame = frameEncoder;
+  final framesArePng = encodeFrame != null;
   Future<void> pump(int frame) async {
     controller.seek(frame);
     await pumpFrame();
   }
 
-  if (framesArePng) {
+  if (encodeFrame != null) {
     await runFrameCaptureLoop(
       config: config,
       digest: digest,
@@ -142,10 +165,19 @@ Future<RenderManifest> renderToSandbox({
       boundaryKey: boundaryKey,
       capture: capture,
       onFrame: (raw) async {
-        final png = await frameEncoder(raw.rgba, raw.width, raw.height);
-        await sandbox.writeBytes(VideoEncoderService.framesPngName(raw.frameIndex), png);
+        final encodeWatch = metrics == null ? null : (Stopwatch()..start());
+        try {
+          final png = await encodeFrame(raw.rgba, raw.width, raw.height);
+          await sandbox.writeBytes(VideoEncoderService.framesPngName(raw.frameIndex), png);
+        } finally {
+          if (encodeWatch != null) {
+            encodeWatch.stop();
+            metrics!.addEncoding(encodeWatch.elapsed);
+          }
+        }
       },
       onProgress: onProgress,
+      metrics: metrics,
     );
   } else {
     final sink = sandbox.openFrames(VideoEncoderService.framesFileName);
@@ -158,6 +190,7 @@ Future<RenderManifest> renderToSandbox({
         sink: sink,
         capture: capture,
         onProgress: onProgress,
+        metrics: metrics,
       );
     } finally {
       await sink.close();

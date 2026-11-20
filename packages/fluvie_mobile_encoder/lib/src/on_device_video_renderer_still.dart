@@ -15,6 +15,7 @@ Future<RawFrame> _captureSingleFrameOnDevice({
   required MediaResolver? mediaResolver,
   required NetworkAllowlist? networkAllowlist,
   required void Function(String message) onWarning,
+  RenderMetrics? metrics,
 }) async {
   final request = resolveFrameCapture(
     composition: composition,
@@ -47,6 +48,7 @@ Future<RawFrame> _captureSingleFrameOnDevice({
         pumpWidget: host.mount,
         pumpFrame: host.pumpFrame,
         resolver: mediaResolver ?? ownedResolver,
+        metrics: metrics,
       ),
     );
   } finally {

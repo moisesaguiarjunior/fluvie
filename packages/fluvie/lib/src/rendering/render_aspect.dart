@@ -24,6 +24,7 @@ import 'package:fluvie/src/rendering/encoding/content_hash.dart';
 import 'package:fluvie/src/rendering/no_generative_resolver.dart';
 import 'package:fluvie/src/rendering/prepare_composition_media.dart';
 import 'package:fluvie/src/rendering/render_config.dart';
+import 'package:fluvie/src/rendering/render_metrics.dart';
 import 'package:fluvie/src/rendering/render_service.dart';
 import 'package:fluvie/src/rendering/runtime/render_controller.dart';
 
@@ -84,6 +85,10 @@ typedef RenderAspectResult = ({RenderManifest manifest, RenderConfig config});
 /// key also gains the active aspect and the seed of every video mounted on the
 /// initial pump. A video that first mounts on a later frame is absent from
 /// that list, so [compositionKey] has to include its seed.
+///
+/// Pass [metrics] to record preparation, mounting, frame pumping, pixel
+/// readback, and cache hits. Omit it and this render allocates no timing
+/// state. The captured frames do not depend on the report.
 Future<RenderAspectResult> render({
   required Widget composition,
   required Aspect aspect,
@@ -101,6 +106,7 @@ Future<RenderAspectResult> render({
   MediaResolver? resolver,
   GenerativeResolver generative = const NoGenerativeResolver(),
   void Function(GenerativeProgress progress)? onGenerativeProgress,
+  RenderMetrics? metrics,
 }) async {
   final size = aspect.sizeFor(longEdge);
   final config = RenderConfig(
@@ -114,13 +120,21 @@ Future<RenderAspectResult> render({
   // produces the files, the media pre-pass warms the decode cache, and the clip
   // pre-pass probes each clip — so the audio collector below knows which clips
   // actually carry an audio track. A null resolver is a media-less render.
-  await prepareCompositionMedia(
-    composition: composition,
-    totalFrames: frameCount,
-    resolver: resolver,
-    generative: generative,
-    onGenerativeProgress: onGenerativeProgress,
-  );
+  final mediaWatch = metrics == null ? null : (Stopwatch()..start());
+  try {
+    await prepareCompositionMedia(
+      composition: composition,
+      totalFrames: frameCount,
+      resolver: resolver,
+      generative: generative,
+      onGenerativeProgress: onGenerativeProgress,
+    );
+  } finally {
+    if (mediaWatch != null) {
+      mediaWatch.stop();
+      metrics!.addPreparation(mediaWatch.elapsed);
+    }
+  }
   // The encoder audio mix: an explicit stager wins; otherwise a `Video`
   // composition's own `Audio` tracks (plus any generated audio and a clip's
   // embedded audio) are collected and staged so a public `render(video, aspect:)`
@@ -151,8 +165,24 @@ Future<RenderAspectResult> render({
   // pumpWidget builds at frame 0, before the capture loop's first decode-ahead,
   // so without this the first build's synchronous clip lookup would miss (that
   // build is not captured — the loop re-pumps frame 0 — but it would still throw).
-  await preparer?.prepareClipFrames(0);
-  await pumpWidget(shell.tree);
+  final clipWatch = metrics == null ? null : (Stopwatch()..start());
+  try {
+    await preparer?.prepareClipFrames(0);
+  } finally {
+    if (clipWatch != null) {
+      clipWatch.stop();
+      metrics!.addPreparation(clipWatch.elapsed);
+    }
+  }
+  final mountWatch = metrics == null ? null : (Stopwatch()..start());
+  try {
+    await pumpWidget(shell.tree);
+  } finally {
+    if (mountWatch != null) {
+      mountWatch.stop();
+      metrics!.addMounting(mountWatch.elapsed);
+    }
+  }
   final manifest = await service.captureToDirectory(
     config: config,
     outDir: outDir,
@@ -176,6 +206,7 @@ Future<RenderAspectResult> render({
     ),
     audioSources: audio.audioSources,
     stageAudio: audio.stageAudio,
+    metrics: metrics,
   );
   return (manifest: manifest, config: config);
 }

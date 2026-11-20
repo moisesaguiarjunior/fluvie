@@ -15,9 +15,11 @@ export 'package:fluvie/rendering.dart'
     show
         NetworkAllowlist,
         RawFrame,
+        RenderMetrics,
         RenderPhase,
         RenderProgress,
         RenderProgressCallback,
+        StageTiming,
         VideoRenderer,
         encodeRawFramePng,
         frameIndexFor;

@@ -49,3 +49,19 @@ Future<Uint8List> captureCoverWithHost({
   return encodeRawFramePng(raw);
 }
 // #enddocregion custom-host
+
+// #docregion metrics
+Future<RawFrame> captureCoverMeasured({
+  required ShellMount mount,
+  required ShellFramePump pump,
+  required RenderMetrics metrics,
+}) => captureFrame(
+  composition: Directionality(textDirection: TextDirection.ltr, child: coverScene()),
+  aspect: Aspect.square,
+  frame: 0,
+  longEdge: 96,
+  pumpWidget: mount,
+  pumpFrame: pump,
+  metrics: metrics,
+);
+// #enddocregion metrics

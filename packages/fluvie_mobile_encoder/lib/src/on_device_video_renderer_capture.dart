@@ -47,6 +47,7 @@ Future<RenderAspectResult> _captureToSandbox({
   required int fps,
   required String compositionKey,
   required MediaResolver resolver,
+  RenderMetrics? metrics,
 }) => render(
   composition: composition,
   aspect: aspect,
@@ -60,6 +61,7 @@ Future<RenderAspectResult> _captureToSandbox({
   compositionKey: compositionKey,
   stageAudio: _silentAudio,
   resolver: resolver,
+  metrics: metrics,
 );
 
 Future<AudioMixLanes> _silentAudio({

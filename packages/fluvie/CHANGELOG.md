@@ -20,6 +20,14 @@ Fork pre-release. Not published to pub.dev.
 - `FrameContext` exposes `time`, `size`, `aspect`, and `seed`. `Video(seed:)`
   carries the seed. Capture reports the output canvas; a preview reports the
   video's declared size.
+- Optional `RenderMetrics` on `captureFrame`, `render`, `renderVideo`,
+  `renderToSandbox`, `RenderService`, and `OnDeviceVideoRenderer`. The report
+  covers preparation, mounting, per-frame pumping and readback, encoding,
+  frame count, and cache hits. `RenderService.captureToDirectory` records one
+  preparation sample for its media, audio, and mix work. `renderToSandbox`
+  records one encoding sample per PNG when a frame encoder is set. Omitting
+  the report leaves captured pixels unchanged. A cache hit still pumps the
+  frame and skips the pixel readback.
 
 ### Fixed
 

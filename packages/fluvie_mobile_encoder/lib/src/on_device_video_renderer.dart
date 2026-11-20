@@ -107,6 +107,11 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
   ///
   /// Throws an [ArgumentError] for a non-positive [duration] or [fps], and a
   /// `FluvieMobileEncoderException` when the device encoder fails.
+  ///
+  /// Pass [metrics] to record preparation, mounting, frame pumping, pixel
+  /// readback, and the hardware encode. Omit it and this render allocates no
+  /// timing state. The captured frames and the encoded file do not depend on
+  /// the report.
   @override
   Future<File> render({
     required Widget composition,
@@ -121,6 +126,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     String compositionKey = 'render',
     RenderProgressCallback? onProgress,
     File? outputFile,
+    RenderMetrics? metrics,
   }) async {
     final frameCount = frameCountFor(duration, fps);
     final size = aspect.sizeFor(longEdge);
@@ -154,6 +160,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
           fps: fps,
           compositionKey: compositionKey,
           resolver: resolver,
+          metrics: metrics,
         ),
       );
       final manifest = captured.manifest;
@@ -168,25 +175,33 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
       );
       final outputPath = outputFile?.path ?? '${sandbox.path}/${manifest.outputFileName}';
       onProgress?.call(RenderProgress(RenderPhase.encoding, compositionKey: compositionKey));
-      await runStage(
-        RenderPhase.encoding,
-        () => _encoder.encode(
-          MobileEncodeRequest(
-            framesPath: '${sandbox.path}/${manifest.framesFileName}',
-            outputPath: outputPath,
-            width: manifest.width,
-            height: manifest.height,
-            fps: manifest.fps,
-            frameCount: manifest.frameCount,
-            bitRate:
-                bitRate ??
-                defaultBitRate(width: manifest.width, height: manifest.height, fps: manifest.fps),
-            codec: codec,
-            audioTracks: mix.tracks,
-            audioMasterVolume: mix.masterVolume,
+      final encodeWatch = metrics == null ? null : (Stopwatch()..start());
+      try {
+        await runStage(
+          RenderPhase.encoding,
+          () => _encoder.encode(
+            MobileEncodeRequest(
+              framesPath: '${sandbox.path}/${manifest.framesFileName}',
+              outputPath: outputPath,
+              width: manifest.width,
+              height: manifest.height,
+              fps: manifest.fps,
+              frameCount: manifest.frameCount,
+              bitRate:
+                  bitRate ??
+                  defaultBitRate(width: manifest.width, height: manifest.height, fps: manifest.fps),
+              codec: codec,
+              audioTracks: mix.tracks,
+              audioMasterVolume: mix.masterVolume,
+            ),
           ),
-        ),
-      );
+        );
+      } finally {
+        if (encodeWatch != null) {
+          encodeWatch.stop();
+          metrics!.addEncoding(encodeWatch.elapsed);
+        }
+      }
       onProgress?.call(RenderProgress(RenderPhase.complete, compositionKey: compositionKey));
       return File(outputPath);
     } finally {
@@ -213,6 +228,8 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
   /// both for frame `0`. Set [stepThrough] to `true` when [composition]
   /// contains stateful widgets whose output depends on visiting intermediate
   /// frames `0..target`.
+  /// Pass [metrics] to record the still capture. This method does not encode,
+  /// so the encoding stage stays empty.
   Future<RawFrame> captureFrame({
     required Widget composition,
     required Aspect aspect,
@@ -221,6 +238,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     int? fps,
     int longEdge = VideoDefaults.longEdge,
     bool stepThrough = false,
+    RenderMetrics? metrics,
   }) => _captureSingleFrameOnDevice(
     composition: composition,
     aspect: aspect,
@@ -234,11 +252,14 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     mediaResolver: mediaResolver,
     networkAllowlist: networkAllowlist,
     onWarning: _onWarning,
+    metrics: metrics,
   );
 
   /// Captures a single deterministic PNG image (alpha preserved) of
   /// [composition] at [frame] or [at] on-device, without invoking the video
   /// encoder.
+  /// Pass [metrics] to record the still capture behind the PNG. The PNG encode
+  /// itself is not an encoding sample.
   Future<Uint8List> capturePng({
     required Widget composition,
     required Aspect aspect,
@@ -247,6 +268,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
     int? fps,
     int longEdge = VideoDefaults.longEdge,
     bool stepThrough = false,
+    RenderMetrics? metrics,
   }) async {
     final raw = await captureFrame(
       composition: composition,
@@ -256,6 +278,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
       fps: fps,
       longEdge: longEdge,
       stepThrough: stepThrough,
+      metrics: metrics,
     );
     return encodeRawFramePng(raw);
   }
