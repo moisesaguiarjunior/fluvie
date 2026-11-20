@@ -276,8 +276,27 @@ jobs:
           dart pub global activate melos
           echo "${PUB_CACHE:-$HOME/.pub-cache}/bin" >> "$GITHUB_PATH"
       - run: melos bootstrap
-      - run: flutter build apk --debug
+      - name: Build Android example APK
         working-directory: examples/mobile_purrfect
+        shell: bash
+        run: |
+          # The Flutter SDK's included Gradle build has its own plugin repositories.
+          # Resolve its Kotlin artifacts directly from Maven Central before using the Plugin Portal.
+          export FLUVIE_FLUTTER_GRADLE_DIR="$(cd "$(dirname "$(command -v flutter)")/../packages/flutter_tools/gradle" && pwd -P)"
+          gradle_init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$gradle_init_dir"
+          cat > "$gradle_init_dir/fluvie-flutter-repositories.init.gradle" <<'GRADLE'
+          gradle.beforeSettings { settings ->
+              def flutterGradleDir = new File(System.getenv('FLUVIE_FLUTTER_GRADLE_DIR')).canonicalFile
+              if (settings.settingsDir.canonicalFile == flutterGradleDir) {
+                  settings.pluginManagement.repositories {
+                      mavenCentral()
+                      gradlePluginPortal()
+                  }
+              }
+          }
+          GRADLE
+          flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with:
           name: example-mobile-purrfect-apk
