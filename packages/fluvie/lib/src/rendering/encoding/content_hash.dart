@@ -33,3 +33,20 @@ String renderDigest({
     }),
   ),
 );
+
+/// Composition key stored in a frame-cache digest.
+///
+/// [seeds] lists every video mounted when the key is built, in tree order, and
+/// each entry is part of the key, including zero. Pixels cached for one
+/// sequence are not replayed for another. One seed keeps the single-video
+/// spelling. A video that mounts on a later frame is not in [seeds]; the
+/// caller-supplied [compositionKey] has to include that seed. Pass the active
+/// [aspectName] to distinguish layout variants that share a canvas size.
+String frameCacheCompositionKey(
+  String compositionKey, {
+  required List<int> seeds,
+  String? aspectName,
+}) {
+  final aspect = aspectName == null ? '' : '-$aspectName';
+  return '$compositionKey$aspect-seed-${seeds.join('-')}';
+}

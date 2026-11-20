@@ -27,6 +27,12 @@ released on success or failure. Validate this with Handcrafted textures, volume,
 stitch geometry. Preserve the existing frame, progress, noise, and audio
 behavior for current builders.
 
+The first change adds `time`, `size`, `aspect`, and `seed` to `FrameContext`.
+The Handcrafted 0.3.1 pilot used typed constructor arguments and prepared one
+consumer-owned texture cache per offscreen mount. The cache was released after
+successful capture and a failed pixel readback. Add a public resource scope when
+a consumer needs a lifecycle the widget tree cannot express.
+
 ## 3. Render metrics
 
 Measure preparation and mounting, frame pumping, pixel readback, and encoding.

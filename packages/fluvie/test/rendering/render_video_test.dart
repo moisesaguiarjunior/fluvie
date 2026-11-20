@@ -13,9 +13,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart' hide Image;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluvie/src/animation/frame_builder.dart';
+import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/composition/scene.dart';
 import 'package:fluvie/src/composition/video.dart';
 import 'package:fluvie/src/core/aspect.dart';
+import 'package:fluvie/src/core/errors/fluvie_timing_error.dart';
 import 'package:fluvie/src/core/time_extensions.dart';
 import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/snapshot.dart';
@@ -43,14 +46,16 @@ Future<({RenderManifest manifest, Uint8List frames, (int, int)? cacheReport})> _
   Aspect? aspect,
   int? frameCountOverride,
   bool cacheEnabled = false,
+  Directory? cacheRoot,
+  Aspect? hostAspect,
 }) async {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   final dir = Directory.systemTemp.createTempSync('fluvie_render_video_');
   addTearDown(() => dir.deleteSync(recursive: true));
   // A temp cache root so a test never reads or writes the developer's real one.
-  final cacheRoot = Directory.systemTemp.createTempSync('fluvie_render_video_cache_');
-  addTearDown(() => cacheRoot.deleteSync(recursive: true));
+  final frameCache = cacheRoot ?? Directory.systemTemp.createTempSync('fluvie_render_video_cache_');
+  if (cacheRoot == null) addTearDown(() => frameCache.deleteSync(recursive: true));
 
   (int, int)? report;
   final manifest = await renderVideo(
@@ -59,12 +64,13 @@ Future<({RenderManifest manifest, Uint8List frames, (int, int)? cacheReport})> _
     aspect: aspect,
     frameCountOverride: frameCountOverride,
     cacheEnabled: cacheEnabled,
-    cacheRoot: cacheRoot,
+    cacheRoot: frameCache,
     setViewSize: (width, height) {
       tester.view.physicalSize = ui.Size(width.toDouble(), height.toDouble());
       tester.view.devicePixelRatio = 1.0;
     },
-    pumpWidget: tester.pumpWidget,
+    pumpWidget: (tree) =>
+        tester.pumpWidget(hostAspect == null ? tree : AspectScope(aspect: hostAspect, child: tree)),
     pumpFrame: () => tester.pump(),
     runAsync: tester.runAsync,
     onCacheReport: (hits, total) => report = (hits, total),
@@ -153,6 +159,74 @@ void main() {
       final r = await _render(tester, video: video);
       expect(r.frames.length, 16 * 16 * 4 * 2);
     });
+
+    testWidgets('a Snapshot child keeps the capture seed, aspect, and canvas', (tester) async {
+      int? seed;
+      Aspect? aspect;
+      Size? size;
+      final video = Video(
+        size: const VideoSize(32, 8),
+        seed: 42,
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: Snapshot(
+                  child: FrameBuilder((ctx) {
+                    seed = ctx.seed;
+                    aspect = ctx.aspect;
+                    size = ctx.size;
+                    final matches =
+                        ctx.seed == 42 &&
+                        ctx.aspect == Aspect.square &&
+                        ctx.size == const Size.square(32);
+                    return ColoredBox(
+                      color: matches ? const Color(0xFF112233) : const Color(0xFFFF0000),
+                      child: const SizedBox.expand(),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+      final r = await _render(
+        tester,
+        video: video,
+        aspect: Aspect.square,
+        frameCountOverride: 1,
+      );
+      expect(seed, 42);
+      expect(aspect, Aspect.square);
+      expect(size, const Size.square(32));
+      expect((r.manifest.width, r.manifest.height), (32, 32));
+      expect(r.frames.sublist(0, 4), const [0x11, 0x22, 0x33, 0xFF]);
+    });
+
+    testWidgets('a Snapshot child cannot read the frame clock', (tester) async {
+      final video = Video(
+        size: const VideoSize(16, 16),
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: Snapshot(
+                  child: FrameBuilder((ctx) {
+                    ctx.time;
+                    return const ColoredBox(color: Color(0xFF112233), child: SizedBox.expand());
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+      await _render(tester, video: video, frameCountOverride: 1);
+      expect(tester.takeException(), isA<FluvieTimingError>());
+    });
   });
 
   group('cache report', () {
@@ -191,6 +265,113 @@ void main() {
       expect(report, (0, 2), reason: 'a cold cache captures every frame');
       await once();
       expect(report, (2, 2), reason: 'a warm cache replays both frames');
+    });
+
+    testWidgets('same-size renders cache frames by their active aspect', (tester) async {
+      final cacheRoot = Directory.systemTemp.createTempSync('fluvie_render_video_aspect_cache_');
+      addTearDown(() => cacheRoot.deleteSync(recursive: true));
+      final video = Video(
+        size: const VideoSize(16, 16),
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: FrameBuilder(
+                  (ctx) => ColoredBox(
+                    color: ctx.aspect == Aspect.square
+                        ? const Color(0xFF0000FF)
+                        : const Color(0xFFFF0000),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final fallback = await _render(
+        tester,
+        video: video,
+        cacheEnabled: true,
+        cacheRoot: cacheRoot,
+      );
+      final square = await _render(
+        tester,
+        video: video,
+        aspect: Aspect.square,
+        cacheEnabled: true,
+        cacheRoot: cacheRoot,
+      );
+      final inherited = await _render(
+        tester,
+        video: video,
+        hostAspect: Aspect.square,
+        cacheEnabled: true,
+        cacheRoot: cacheRoot,
+      );
+
+      expect((fallback.manifest.width, fallback.manifest.height), (16, 16));
+      expect((square.manifest.width, square.manifest.height), (16, 16));
+      expect(fallback.frames.sublist(0, 4), const [255, 0, 0, 255]);
+      expect(square.frames.sublist(0, 4), const [0, 0, 255, 255]);
+      expect(square.cacheReport, (0, 1));
+      expect(inherited.frames, square.frames);
+      expect(inherited.cacheReport, (1, 1));
+    });
+
+    testWidgets('a different seed does not replay cached frames', (tester) async {
+      final dir = Directory.systemTemp.createTempSync('fluvie_render_video_seed_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final cacheRoot = Directory.systemTemp.createTempSync('fluvie_render_video_seed_cache_');
+      addTearDown(() => cacheRoot.deleteSync(recursive: true));
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      Video seeded(int seed) => Video(
+        size: const VideoSize(8, 8),
+        seed: seed,
+        scenes: [
+          Scene(
+            duration: 1.frames,
+            children: [
+              Positioned.fill(
+                child: FrameBuilder(
+                  (ctx) => ColoredBox(
+                    color: Color(0xFF000000 + ctx.seed),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+
+      Future<Uint8List> once(int seed) async {
+        await renderVideo(
+          video: seeded(seed),
+          outDir: dir,
+          cacheEnabled: true,
+          cacheRoot: cacheRoot,
+          compositionKey: 'same',
+          setViewSize: (width, height) {
+            tester.view.physicalSize = ui.Size(width.toDouble(), height.toDouble());
+            tester.view.devicePixelRatio = 1.0;
+          },
+          pumpWidget: tester.pumpWidget,
+          pumpFrame: () => tester.pump(),
+          runAsync: tester.runAsync,
+        );
+        return File('${dir.path}/frames.rgba').readAsBytesSync();
+      }
+
+      final first = await once(1);
+      final second = await once(2);
+      final again = await once(1);
+      expect(first.sublist(0, 4), const [0x00, 0x00, 0x01, 0xFF]);
+      expect(second.sublist(0, 4), const [0x00, 0x00, 0x02, 0xFF]);
+      expect(again, first);
     });
   });
 

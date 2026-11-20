@@ -62,4 +62,51 @@ void main() {
       expect(digestOf(version: '0.2.0'), isNot(digestOf()));
     });
   });
+
+  group('frameCacheCompositionKey', () {
+    test('always includes the seed, including zero and a negative seed', () {
+      expect(frameCacheCompositionKey('render', seeds: [0]), 'render-seed-0');
+      expect(frameCacheCompositionKey('render', seeds: [2]), 'render-seed-2');
+      expect(
+        frameCacheCompositionKey('render', aspectName: 'square', seeds: [0]),
+        'render-square-seed-0',
+      );
+      expect(
+        frameCacheCompositionKey('render', aspectName: 'square', seeds: [-9]),
+        'render-square-seed--9',
+      );
+      expect(frameCacheCompositionKey('render', seeds: [0]), isNot('render'));
+    });
+
+    test('keeps every mounted seed in order', () {
+      expect(frameCacheCompositionKey('render', seeds: [1, 2]), 'render-seed-1-2');
+      expect(
+        frameCacheCompositionKey('render', aspectName: 'square', seeds: [1, 3]),
+        'render-square-seed-1-3',
+      );
+      expect(
+        frameCacheCompositionKey('render', seeds: [1, 3]),
+        isNot(frameCacheCompositionKey('render', seeds: [1, 2])),
+      );
+      expect(
+        frameCacheCompositionKey('render', seeds: [2, 1]),
+        isNot(frameCacheCompositionKey('render', seeds: [1, 2])),
+      );
+      expect(
+        frameCacheCompositionKey('render', seeds: [1]),
+        isNot(frameCacheCompositionKey('render', seeds: [1, 2])),
+      );
+    });
+
+    test('two seeds never share a digest', () {
+      final config = RenderConfig(width: 16, height: 16, frameCount: 1);
+      String digest(int seed) => renderDigest(
+        config: config,
+        compositionKey: frameCacheCompositionKey('demo', seeds: [seed]),
+        fluvieVersion: '0.1.0',
+      );
+      expect(digest(1), isNot(digest(2)));
+      expect(digest(0), isNot(digest(1)));
+    });
+  });
 }
