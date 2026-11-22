@@ -168,6 +168,7 @@ mixin ClipResolveCache on ImageResolveCache {
     required int compFps,
     required int trimStartFrames,
     required int trimEndFrames,
+    int Function(int)? sceneFrame,
   }) {
     _streamer.registerPlan(source, (
       windowStart: windowStart,
@@ -175,6 +176,7 @@ mixin ClipResolveCache on ImageResolveCache {
       compFps: compFps,
       trimStartFrames: trimStartFrames,
       trimEndFrames: trimEndFrames,
+      sceneFrame: sceneFrame,
     ));
   }
 

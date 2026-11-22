@@ -61,11 +61,11 @@ void main() {
       );
     });
 
-    test('a delay emits an order-stable adelay in ms on both channels', () {
+    test('a delay emits an order-stable adelay in ms for all channels', () {
       const node = AudioTrackNode(name: 't.wav', delayMs: 1500);
       expect(
         node.filterChain(inputIndex: 1, label: 'a0'),
-        '[1:a]asetpts=PTS-STARTPTS,adelay=1500|1500,volume=1[a0]',
+        '[1:a]asetpts=PTS-STARTPTS,adelay=1500:all=1,volume=1[a0]',
       );
     });
 
@@ -119,6 +119,19 @@ void main() {
       expect(node.filterChain(inputIndex: 1, label: 'a0'), isNot(contains('aloop')));
     });
 
+    test('a scene cap trims the repeated track before the delay', () {
+      const node = AudioTrackNode(
+        name: 'song.wav',
+        loop: true,
+        trimEndSeconds: 0.2,
+        delayMs: 1000,
+        maxPlaybackSeconds: 1,
+      );
+      final chain = node.filterChain(inputIndex: 1, label: 'a0');
+      expect(chain, contains('atrim=end=0.2,asetpts=PTS-STARTPTS,aloop='));
+      expect(chain, contains(',atrim=duration=1,adelay=1000:all=1,'));
+    });
+
     test('the full chain orders atrim, asetpts, adelay, volume, fades', () {
       const node = AudioTrackNode(
         name: 't.wav',
@@ -132,8 +145,8 @@ void main() {
       );
       expect(
         node.filterChain(inputIndex: 3, label: 'a2'),
-        '[3:a]atrim=start=1:end=9,asetpts=PTS-STARTPTS,adelay=500|500,volume=0.8,'
-        'afade=t=in:st=0:d=1,afade=t=out:st=7:d=1.5[a2]',
+        '[3:a]atrim=start=1:end=9,asetpts=PTS-STARTPTS,adelay=500:all=1,asetpts=N/SR/TB,volume=0.8,'
+        'afade=t=in:st=0.5:d=1,afade=t=out:st=7.5:d=1.5[a2]',
       );
     });
   });
@@ -181,7 +194,7 @@ void main() {
       const amix = AmixNode(inputCount: 2);
       expect(
         amix.mixChain(labels: ['a0', 'a1'], outLabel: 'aout'),
-        '[a0][a1]amix=inputs=2:normalize=0,volume=1[aout]',
+        '[a0][a1]amix=inputs=2:normalize=0,volume=1,apad[aout]',
       );
     });
 
@@ -189,7 +202,7 @@ void main() {
       const amix = AmixNode(inputCount: 1, masterVolume: 0.6);
       expect(
         amix.mixChain(labels: ['a0'], outLabel: 'aout'),
-        '[a0]amix=inputs=1:normalize=0,volume=0.6[aout]',
+        '[a0]amix=inputs=1:normalize=0,volume=0.6,apad[aout]',
       );
     });
 

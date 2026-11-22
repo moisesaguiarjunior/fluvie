@@ -14,7 +14,7 @@ import android.os.Build
  * rotation) and [extractFrames] scales each frame to the requested size.
  */
 object VideoFrameReader {
-  /** Probes [path] for `width`, `height`, `frameCount`, `durationMs`, `codec`. */
+  /** Probes [path] for `width`, `height`, `frameCount`, `durationMs`, `codec`, `hasAudio`. */
   fun probe(path: String): Map<String, Any?> {
     requireFrameApi()
     val retriever = MediaMetadataRetriever()
@@ -42,6 +42,7 @@ object VideoFrameReader {
         "height" to height,
         "frameCount" to frameCount,
         "durationMs" to durationMs,
+        "hasAudio" to (meta(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) != null),
         "codec" to codecName(mime),
       )
     } finally {

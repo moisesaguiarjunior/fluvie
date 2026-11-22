@@ -26,6 +26,8 @@ abstract interface class ClipFramePreparer {
   /// `[trimStartFrames, trimEndFrames)`. The source fps comes from the clip's
   /// already-probed metadata. Identical placements are idempotent, and
   /// distinct placements of the same source are registered separately.
+  /// [sceneFrame] maps the render clock to the frame the clip's scene reads
+  /// during a held outgoing transition.
   void registerClipPlan({
     required MediaSource source,
     required int windowStart,
@@ -33,6 +35,7 @@ abstract interface class ClipFramePreparer {
     required int compFps,
     required int trimStartFrames,
     required int trimEndFrames,
+    int Function(int)? sceneFrame,
   });
 
   /// Decodes (into the bounded window) the clip frames composition frame

@@ -23,7 +23,7 @@ import 'package:meta/meta.dart';
 final class BandTable {
   /// Creates a table over per-band energy lists; every band present must share
   /// one length (the [totalFrames]). An absent band reads as zero.
-  BandTable(Map<AudioBand, Float64List> energies)
+  BandTable(Map<AudioBand, Float64List> energies, {this.sourceFrames})
     : _energies = {
         for (final entry in energies.entries) entry.key: Float64List.fromList(entry.value),
       };
@@ -33,7 +33,7 @@ final class BandTable {
     for (final band in AudioBand.values)
       if (json[band.name] case final List<Object?> values)
         band: Float64List.fromList([for (final v in values) (v! as num).toDouble()]),
-  });
+  }, sourceFrames: (json['sourceFrames'] as num?)?.toDouble());
 
   /// Resamples per-hop band sums onto one value per video frame.
   ///
@@ -49,6 +49,7 @@ final class BandTable {
     required int sampleRate,
     required int fps,
     required int totalFrames,
+    double? sourceFrames,
   }) => BandTable({
     for (final band in AudioBand.values)
       if (hopEnergies[band] case final Float64List hops)
@@ -59,9 +60,12 @@ final class BandTable {
           fps: fps,
           totalFrames: totalFrames,
         ),
-  });
+  }, sourceFrames: sourceFrames);
 
   final Map<AudioBand, Float64List> _energies;
+
+  /// Length of the decoded source in video frames, including fractional frames.
+  final double? sourceFrames;
 
   /// The number of video frames this table covers (the per-band length, or `0`
   /// when the table is empty).
@@ -86,6 +90,7 @@ final class BandTable {
   /// The JSON form: each present band's name mapped to its energy list, always
   /// emitted in `AudioBand` order so two encodes are byte-identical.
   Map<String, Object?> toJson() => {
+    if (sourceFrames != null) 'sourceFrames': sourceFrames,
     for (final band in AudioBand.values)
       if (_energies[band] case final Float64List energies) band.name: energies.toList(),
   };
@@ -96,7 +101,9 @@ final class BandTable {
   @override
   bool operator ==(Object other) {
     if (other is! BandTable) return false;
-    if (other._energies.length != _energies.length) return false;
+    if (other.sourceFrames != sourceFrames || other._energies.length != _energies.length) {
+      return false;
+    }
     for (final band in AudioBand.values) {
       final mine = _energies[band];
       final theirs = other._energies[band];
@@ -112,6 +119,7 @@ final class BandTable {
 
   @override
   int get hashCode => Object.hashAll([
+    sourceFrames,
     for (final band in AudioBand.values)
       if (_energies[band] case final Float64List energies)
         Object.hash(band, Object.hashAll(energies)),

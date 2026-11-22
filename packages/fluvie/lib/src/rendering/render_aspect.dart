@@ -16,6 +16,7 @@ import 'package:fluvie/src/core/contracts/generative_resolver.dart'
     show GenerativeProgress, GenerativeResolver;
 import 'package:fluvie/src/core/contracts/media_resolver.dart' show MediaResolver;
 import 'package:fluvie/src/core/defaults.dart';
+import 'package:fluvie/src/rendering/audio_mix_resolution.dart' show resolveDeclaredAudioTracks;
 import 'package:fluvie/src/rendering/capture/capture_shell.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/clip_audio_staging.dart';
@@ -248,7 +249,7 @@ List<int> _mountedVideoSeeds(BuildContext? boundary) {
 /// Resolves the encoder audio mix for [composition]: an explicit
 /// [explicitStager]/[explicitSources] pair wins; otherwise a [Video]
 /// composition's declared `Audio` tracks are collected and turned into a
-/// [stageAudioMix] closure against [fps]/[totalFrames] (so `Audio.sfx(at:)`
+/// [stageResolvedAudioMix] closure against [fps]/[totalFrames] (so `Audio.sfx(at:)`
 /// resolves its `adelay`). A non-`Video` or track-less composition yields
 /// `(null, const [])`, so the encoder's `-an` path is unchanged.
 ({AudioMixStager? stageAudio, Iterable<AudioSource> audioSources}) _audioFor(
@@ -263,17 +264,26 @@ List<int> _mountedVideoSeeds(BuildContext? boundary) {
   if (explicitStager != null) {
     return (stageAudio: explicitStager, audioSources: explicitSources ?? const []);
   }
-  if (composition is! Video) return (stageAudio: null, audioSources: const []);
-  final tracks = collectAudioTracks(composition, generative: generative);
+  final video = compositionVideo(composition);
+  if (video == null) return (stageAudio: null, audioSources: const []);
+  final tracks = resolveDeclaredAudioTracks(
+    video,
+    fps: fps,
+    totalFrames: totalFrames,
+    generative: generative,
+  );
   // Only clips that actually carry an audio track join the mix (each was probed
   // above); a silent clip would otherwise fail the encoder's `[N:a]` map.
-  final clipPlans = resolver == null
+  final clipMetadataFor = resolver?.clipMetadataFor;
+  final clipPlans = clipMetadataFor == null
       ? const <ClipAudioPlan>[]
       : collectClipAudioPlans(
-          composition.scenes,
-          fps,
+          video.scenes,
+          video.fps,
+          sceneStartFrames: video.sceneStartFrames,
+          videoFrames: video.totalFrames,
           generative: generative,
-        ).where((plan) => resolver.clipMetadataFor(plan.source).hasAudio).toList();
+        ).where((plan) => clipMetadataFor(plan.source).hasAudio).toList();
   if (tracks.isEmpty && clipPlans.isEmpty) {
     return (stageAudio: null, audioSources: const []);
   }
@@ -283,23 +293,22 @@ List<int> _mountedVideoSeeds(BuildContext? boundary) {
       // the clip's video file and joins the same amix as the declared tracks.
       final clipNodes = await stageClipAudio(
         plans: clipPlans,
+        clipMetadataFor: clipMetadataFor,
         resolver: resolver,
         sandbox: sandbox,
         fps: fps,
         totalFrames: totalFrames,
       );
-      final plan = await stageAudioMix(
+      final plan = await stageResolvedAudioMix(
         tracks: tracks,
         resolver: resolver,
         sandbox: sandbox,
-        fps: fps,
-        totalFrames: totalFrames,
         extraNodes: clipNodes,
       );
       return (nodes: plan.tracks, amix: plan.amix);
     },
     audioSources: {
-      ...collectAudioSources(composition, generative: generative),
+      ...collectAudioSources(video, generative: generative),
       for (final plan in clipPlans) clipAudioSourceFor(plan.source),
     },
   );

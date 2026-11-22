@@ -8,6 +8,7 @@ struct AudioTrackSpec {
   let volume: Float
   let trimStartSeconds: Double?
   let trimEndSeconds: Double?
+  let maxPlaybackSeconds: Double?
   let fadeInSeconds: Double?
   let fadeOutSeconds: Double?
   let fadeOutStartSeconds: Double
@@ -20,6 +21,7 @@ struct AudioTrackSpec {
     self.volume = Float(map["volume"] as? Double ?? 1)
     self.trimStartSeconds = map["trimStartSeconds"] as? Double
     self.trimEndSeconds = map["trimEndSeconds"] as? Double
+    self.maxPlaybackSeconds = map["maxPlaybackSeconds"] as? Double
     self.fadeInSeconds = map["fadeInSeconds"] as? Double
     self.fadeOutSeconds = map["fadeOutSeconds"] as? Double
     self.fadeOutStartSeconds = map["fadeOutStartSeconds"] as? Double ?? 0
@@ -100,26 +102,33 @@ final class AudioComposer {
     fillTo durationSeconds: Double
   ) throws -> AVMutableAudioMixInputParameters? {
     let asset = AVURLAsset(url: URL(fileURLWithPath: spec.path))
-    guard
-      let sourceAudio = asset.tracks(withMediaType: .audio).first,
+    guard let sourceAudio = asset.tracks(withMediaType: .audio).first else { return nil }
+
+    let scale: CMTimeScale = 44100
+    let bounds = sourceAudio.timeRange
+    let start = spec.trimStartSeconds.map { CMTime(seconds: $0, preferredTimescale: scale) }
+      ?? bounds.start
+    let end = spec.trimEndSeconds.map { CMTime(seconds: $0, preferredTimescale: scale) }
+      ?? bounds.end
+    let trimStart = max(start, bounds.start)
+    let trimEnd = min(end, bounds.end)
+    guard trimEnd > trimStart else { return nil }
+    let sourceRange = CMTimeRange(start: trimStart, end: trimEnd)
+
+    let at = CMTime(value: CMTimeValue(spec.delayMs), timescale: 1000)
+    let playUntil = min(durationSeconds, at.seconds + (spec.maxPlaybackSeconds ?? durationSeconds))
+    let available = CMTime(seconds: max(0, playUntil - at.seconds), preferredTimescale: scale)
+    guard available > .zero,
       let compositionAudio = composition.addMutableTrack(
         withMediaType: .audio,
         preferredTrackID: kCMPersistentTrackID_Invalid
       )
     else { return nil }
-
-    let scale: CMTimeScale = 44100
-    let start = spec.trimStartSeconds ?? 0
-    let end = spec.trimEndSeconds ?? CMTimeGetSeconds(asset.duration)
-    let sourceRange = CMTimeRange(
-      start: CMTime(seconds: start, preferredTimescale: scale),
-      duration: CMTime(seconds: max(0, end - start), preferredTimescale: scale)
-    )
-    let at = CMTime(value: CMTimeValue(spec.delayMs), timescale: 1000)
-    if spec.loop && sourceRange.duration.seconds > 0 {
-      try tile(sourceRange, of: sourceAudio, into: compositionAudio, from: at, fillTo: durationSeconds)
+    if spec.loop {
+      try tile(sourceRange, of: sourceAudio, into: compositionAudio, from: at, fillTo: playUntil)
     } else {
-      try compositionAudio.insertTimeRange(sourceRange, of: sourceAudio, at: at)
+      let playable = CMTimeRange(start: sourceRange.start, duration: min(sourceRange.duration, available))
+      try compositionAudio.insertTimeRange(playable, of: sourceAudio, at: at)
     }
 
     let gain = spec.volume * masterVolume

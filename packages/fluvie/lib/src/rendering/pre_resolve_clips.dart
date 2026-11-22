@@ -8,6 +8,7 @@ import 'package:fluvie/src/core/contracts/media_resolver.dart';
 import 'package:fluvie/src/elements/runtime/clip_frame_planner.dart';
 import 'package:fluvie/src/elements/runtime/clip_resampler.dart';
 import 'package:fluvie/src/rendering/collect_composition_media.dart';
+import 'package:fluvie/src/timing/placement/scene_offset_resolver.dart';
 
 /// Pre-resolves every clip in [composition] before the frame loop: probe each
 /// for its [ClipMetadata], plan the source frames it reads, and extract them
@@ -45,14 +46,22 @@ Future<void> preResolveCompositionClips({
   final video = compositionVideo(composition);
   if (video == null) return;
   final fps = video.fps;
+  final offsets = video.sceneOffsets;
   final plans = collectClipPlans(
     video.scenes,
     fps,
     generative: generative,
-    sceneStartFrames: video.sceneStartFrames,
-    videoFrames: video.totalFrames,
+    sceneStartFrames: offsets.startFrames,
+    videoFrames: offsets.totalFrames,
   );
+  // A frozen outgoing scene reads its held frame throughout the blend.
+  final sceneFrames = {
+    for (var index = 0; index < offsets.transitionFrames.length; index++)
+      if (offsets.outgoingHold(index) case final hold?)
+        index: (int frame) => frame >= hold.start && frame < hold.end ? hold.frame : frame,
+  };
   for (final plan in plans) {
+    final sceneFrame = sceneFrames[plan.sceneIndex];
     final meta = await resolver.probeClip(plan.source);
     final bounds = resolveClipTrimBounds(plan.trim, meta);
     final frames = compositionFrames == null
@@ -68,7 +77,7 @@ Future<void> preResolveCompositionClips({
         : {
             for (final frame in compositionFrames)
               resampleClipFrame(
-                compFrame: frame,
+                compFrame: sceneFrame?.call(frame) ?? frame,
                 windowStart: plan.windowStart,
                 compFps: fps,
                 srcFps: meta.fps,
@@ -84,6 +93,7 @@ Future<void> preResolveCompositionClips({
       compFps: fps,
       trimStartFrames: bounds.start,
       trimEndFrames: bounds.end,
+      sceneFrame: sceneFrame,
     );
     await resolver.preResolveClip(plan.source, frames);
   }

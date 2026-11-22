@@ -10,6 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/fluvie.dart';
 import 'package:fluvie/rendering.dart';
 
+import 'fakes/fake_media_resolver.dart';
+
 /// Records every encode invocation and writes the output file the encode
 /// would produce, so the returned [File] exists.
 class _RecordingRunner implements FfmpegRunner {
@@ -90,6 +92,38 @@ void main() {
     expect(phases.first, RenderPhase.capturing);
     expect(phases, contains(RenderPhase.encoding));
     expect(phases.last, RenderPhase.complete);
+  });
+
+  testWidgets('desktop renders declared audio through its default capture service', (tester) async {
+    _pinView(tester);
+    final runner = _RecordingRunner();
+    final sandbox = Directory.systemTemp.createTempSync('fluvie_desktop_audio_test_');
+    addTearDown(() => sandbox.deleteSync(recursive: true));
+    final source = File('${sandbox.path}/source.wav')..writeAsBytesSync(const [1, 2, 3]);
+    final resolver = FakeMediaResolver(
+      const {},
+      audioPaths: {const AudioSource.asset('beat.wav'): source.path},
+    );
+    final renderer = DesktopVideoRenderer(
+      pumpWidget: tester.pumpWidget,
+      pumpFrame: tester.pump,
+      runner: runner,
+      sandboxFactory: () async => sandbox,
+      mediaResolver: resolver,
+    );
+
+    await tester.runAsync(
+      () => renderer.render(
+        composition: _withAudio(),
+        aspect: Aspect.square,
+        duration: const Duration(milliseconds: 66),
+        longEdge: 32,
+      ),
+    );
+
+    final args = runner.encodes.single;
+    expect(args, containsAllInOrder(['-map', '[aout]']));
+    expect(args, isNot(contains('-an')));
   });
 
   testWidgets('audio off on an audio-declaring Video warns once and stays silent', (tester) async {

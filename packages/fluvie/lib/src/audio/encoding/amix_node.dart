@@ -8,7 +8,8 @@ import 'package:meta/meta.dart';
 /// Each `AudioTrackNode` emits a labelled pad; the [AmixNode] consumes all
 /// [inputCount] of them through `amix=inputs=N:normalize=0` (normalize off so a
 /// track's authored gain is preserved, not auto-attenuated) and a final master
-/// `volume`, producing a single output pad the arg builder maps as the audio
+/// `volume`, then pads with silence so the video determines the output length.
+/// The arg builder maps the resulting pad as the audio
 /// stream. Like the track node it serializes typed values only, never a shell
 /// string.
 ///
@@ -39,6 +40,6 @@ final class AmixNode implements FfmpegAudioMix {
     }
     final inputs = labels.map((label) => '[$label]').join();
     final volume = formatFilterNumber(masterVolume);
-    return '${inputs}amix=inputs=$inputCount:normalize=0,volume=$volume[$outLabel]';
+    return '${inputs}amix=inputs=$inputCount:normalize=0,volume=$volume,apad[$outLabel]';
   }
 }

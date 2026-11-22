@@ -21,13 +21,17 @@ import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope.dart';
+import 'package:fluvie/src/audio/audio.dart';
 import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
+import 'package:fluvie/src/composition/scene.dart';
+import 'package:fluvie/src/composition/video.dart';
 import 'package:fluvie/src/core/anchor.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/audio/band_table.dart';
 import 'package:fluvie/src/core/audio_band.dart';
 import 'package:fluvie/src/core/contracts/beat_grid.dart';
+import 'package:fluvie/src/core/time.dart';
 import 'package:fluvie/src/core/video_size.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture_scope.dart';
 import 'package:fluvie/src/media/runtime/image_resolver_scope.dart';
@@ -207,6 +211,58 @@ void main() {
       final scope = BeatGridScope.maybeOf(_contextAt(tester, find.byKey(_kLeaf)))!;
       expect(scope.defaultBeatGrid, same(defaultGrid));
       expect(scope.trackBeatGrids[drums], same(drumGrid));
+    });
+
+    testWidgets('scene bands and beats follow the audible window', (tester) async {
+      final anchor = Anchor('drums');
+      const song = AudioSource.asset('audio/song.mp3');
+      final resolver = await _resolver(
+        bandTables: {
+          song: BandTable({
+            AudioBand.bass: Float64List.fromList(const [1, 0, 0, 0, 0, 0, 0, 0]),
+          }, sourceFrames: 7.5),
+        },
+        beatGrids: {
+          song: FakeBeatGrid(const [0]),
+        },
+      );
+      final video = Video(
+        scenes: [
+          const Scene(duration: Time.seconds(2)),
+          Scene(
+            duration: const Time.seconds(2),
+            audio: [
+              Audio.music('audio/song.mp3', track: anchor, loop: true),
+            ],
+          ),
+          const Scene(duration: Time.seconds(2)),
+        ],
+      );
+      final shell = buildCaptureShell(
+        composition: const SizedBox(key: _kLeaf),
+        boundaryKey: GlobalKey(),
+        controller: RenderController(),
+        resolver: resolver,
+        reactiveTracks: collectReactiveTracks(video),
+      );
+      await tester.pumpWidget(shell.tree);
+      final context = _contextAt(tester, find.byKey(_kLeaf));
+      final beats = BeatGridScope.maybeOf(context)!;
+      for (final track in [null, anchor]) {
+        final table = ReactiveScope.tableFor(context, track)!;
+        expect(table.energiesFor(AudioBand.bass)[59], 0);
+        expect(table.energiesFor(AudioBand.bass)[60], 1);
+        expect(table.energiesFor(AudioBand.bass)[75], 1);
+        expect(table.energiesFor(AudioBand.bass)[90], 1);
+        expect(table.energiesFor(AudioBand.bass)[92], 0);
+        expect(table.energiesFor(AudioBand.bass)[120], 0);
+        final grid = track == null ? beats.defaultBeatGrid! : beats.trackBeatGrids[track]!;
+        expect(grid.firstBeatAtOrAfter(0), 60);
+        expect(grid.firstBeatAtOrAfter(61), 68);
+        expect(grid.firstBeatAtOrAfter(61, every: 2), 75);
+        expect(grid.firstBeatAtOrAfter(76, every: 2), 90);
+        expect(grid.firstBeatAtOrAfter(120), isNull);
+      }
     });
 
     testWidgets('rebuilding the shell twice yields an identical chain', (tester) async {

@@ -6,6 +6,7 @@ import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/contracts/media_resolver.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
+import 'package:fluvie/src/rendering/audio_mix_resolution.dart' show resolveClipAudioTrack;
 import 'package:fluvie/src/timing/time_scope_data.dart';
 
 /// The [AudioSource] FFmpeg extracts a clip's embedded audio from: the clip's
@@ -39,26 +40,19 @@ Future<List<AudioTrackNode>> stageClipAudio({
   required Directory sandbox,
   required int fps,
   required int totalFrames,
+  ClipMetadata Function(MediaSource)? clipMetadataFor,
 }) async {
   final nodes = <AudioTrackNode>[];
   final scope = TimeScopeData(fps: fps, startFrame: 0, durationFrames: totalFrames);
   for (var i = 0; i < plans.length; i++) {
     final plan = plans[i];
+    final track = resolveClipAudioTrack(plan, scope, clipMetadataFor: clipMetadataFor);
+    if (track == null) continue;
     final source = clipAudioSourceFor(plan.source);
     final materialized = resolver.materializedAudioPathFor(source);
     final name = 'clip_audio_${i}_${source.cacheKey}';
     await File(materialized).copy('${sandbox.path}/$name');
-    final fadeInFrames = plan.audio.fadeIn.resolveFrames(scope);
-    nodes.add(
-      AudioTrackNode(
-        name: name,
-        delayMs: (plan.startFrame / fps * 1000).round(),
-        volume: plan.audio.volume,
-        trimStartSeconds: 0,
-        trimEndSeconds: plan.windowFrames / fps,
-        fadeInSeconds: fadeInFrames > 0 ? fadeInFrames / fps : null,
-      ),
-    );
+    nodes.add(AudioTrackNode.fromResolved(track, name: name));
   }
   return nodes;
 }

@@ -98,7 +98,7 @@ void main() {
   testWidgets('an Audio.sfx(at: 1s) lands an adelay in the mix args', (tester) async {
     final manifest = await _render(tester, _sfxEntry, 'sfx');
     final graph = _filterComplex(manifest.ffmpegArgs);
-    expect(graph, contains('adelay=1000|1000'));
+    expect(graph, contains('adelay=1000:all=1'));
   });
 
   testWidgets('a music fade-out is end-anchored, never st=0 (the silent bug)', (tester) async {

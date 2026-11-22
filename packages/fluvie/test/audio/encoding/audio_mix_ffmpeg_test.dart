@@ -11,7 +11,9 @@ import 'package:fluvie/src/audio/encoding/audio_track_node.dart';
 import 'package:fluvie/src/core/quality.dart';
 import 'package:fluvie/src/rendering/encoding/ffmpeg_args.dart';
 import 'package:fluvie/src/rendering/encoding/ffmpeg_filter_graph_builder.dart';
+import 'package:fluvie/src/rendering/encoding/video_encoder_service.dart';
 import 'package:fluvie/src/rendering/platform/process_ffmpeg_runner.dart';
+import 'package:fluvie/src/rendering/render_config.dart';
 
 const _width = 160;
 const _height = 120;
@@ -107,6 +109,27 @@ void main() {
     expect(kinds, containsAll(<String>['video', 'audio']));
     final audio = streams.firstWhere((stream) => stream['codec_type'] == 'audio');
     expect(audio['codec_name'], 'aac');
+  });
+
+  test('a 200 ms effect keeps all 120 video frames', () async {
+    final sandbox = await _newSandbox();
+    await _writeFrames(sandbox, frames: 120);
+    await _genTone(sandbox, 'sfx.wav', frequency: 880);
+    final plan = buildAudioMixPlan(const [AudioTrackNode(name: 'sfx.wav', trimEndSeconds: 0.2)]);
+    const encoder = VideoEncoderService();
+    final args = encoder.planEncodeArgs(
+      RenderConfig(width: _width, height: _height, frameCount: 120),
+      audio: plan.tracks,
+      amix: plan.amix,
+    );
+
+    await ProcessFfmpegRunner().encode(args: args, sandbox: sandbox);
+
+    final probe = await _ffprobe(sandbox);
+    final streams = (probe['streams']! as List<Object?>).cast<Map<String, Object?>>();
+    final video = streams.firstWhere((stream) => stream['codec_type'] == 'video');
+    expect(video['nb_frames'], '120');
+    expect(double.parse(video['duration']! as String), 4);
   });
 
   test('a looping bed fills a video longer than the source (-stream_loop + -shortest)', () async {

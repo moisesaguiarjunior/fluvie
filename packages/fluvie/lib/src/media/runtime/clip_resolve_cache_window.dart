@@ -8,6 +8,7 @@ typedef _ClipPlan = ({
   int compFps,
   int trimStartFrames,
   int trimEndFrames,
+  int Function(int)? sceneFrame,
 });
 
 /// The streaming-mode state behind [ClipResolveCache]: the per-clip plans and
@@ -69,7 +70,11 @@ final class _ClipStreamer {
       if (clipMeta == null) continue;
       await _ensureDecoded(
         source: source,
-        sourceFrame: _resample(compFrame, plan, clipMeta.fps),
+        sourceFrame: _resample(
+          plan.sceneFrame?.call(compFrame) ?? compFrame,
+          plan,
+          clipMeta.fps,
+        ),
         store: store,
         meta: clipMeta,
         // Every registered clip warms one frame per composition frame, so the

@@ -6,6 +6,8 @@ import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/media/clip_audio.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
+import 'package:fluvie/src/core/time.dart';
+import 'package:fluvie/src/core/time_range.dart';
 import 'package:fluvie/src/rendering/clip_audio_staging.dart';
 
 import 'fakes/fake_media_resolver.dart';
@@ -50,19 +52,21 @@ void main() {
           startFrame: 30,
           windowFrames: 60,
           audio: const ClipAudio.included(volume: 0.5),
-          trim: null,
+          trim: const TimeRange(Time.frames(48), Time.frames(72)),
         ),
       ],
       resolver: resolver,
       sandbox: sandbox,
       fps: 30,
       totalFrames: 90,
+      clipMetadataFor: (_) => (fps: 24, frameCount: 96, width: 16, height: 16, hasAudio: true),
     );
 
     expect(nodes, hasLength(1));
     final node = nodes.single;
     expect(node.delayMs, 1000); // 30 frames at 30 fps
-    expect(node.trimEndSeconds, 2.0); // 60-frame window at 30 fps
+    expect(node.trimStartSeconds, 2.0);
+    expect(node.trimEndSeconds, 3.0);
     expect(node.volume, 0.5);
     expect(File('${sandbox.path}/${node.name}').existsSync(), isTrue);
   });

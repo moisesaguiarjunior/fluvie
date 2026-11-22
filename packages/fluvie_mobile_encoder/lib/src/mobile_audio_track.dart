@@ -17,6 +17,7 @@ final class MobileAudioTrack {
     this.volume = 1,
     this.trimStartSeconds,
     this.trimEndSeconds,
+    this.maxPlaybackSeconds,
     this.fadeInSeconds,
     this.fadeOutSeconds,
     this.fadeOutStartSeconds = 0,
@@ -31,6 +32,7 @@ final class MobileAudioTrack {
         volume: track.volume,
         trimStartSeconds: track.trimStartSeconds,
         trimEndSeconds: track.trimEndSeconds,
+        maxPlaybackSeconds: track.maxPlaybackSeconds,
         fadeInSeconds: track.fadeInSeconds,
         fadeOutSeconds: track.fadeOutSeconds,
         fadeOutStartSeconds: track.fadeOutStartSeconds,
@@ -52,6 +54,9 @@ final class MobileAudioTrack {
   /// Where playback ends in the source file, in seconds; `null` plays to the end.
   final double? trimEndSeconds;
 
+  /// Maximum playback after the delay, including repeats.
+  final double? maxPlaybackSeconds;
+
   /// How long the track ramps in from silence, in seconds; `null` for no fade.
   final double? fadeInSeconds;
 
@@ -71,6 +76,7 @@ final class MobileAudioTrack {
     'volume': volume,
     'trimStartSeconds': trimStartSeconds,
     'trimEndSeconds': trimEndSeconds,
+    if (maxPlaybackSeconds != null) 'maxPlaybackSeconds': maxPlaybackSeconds,
     'fadeInSeconds': fadeInSeconds,
     'fadeOutSeconds': fadeOutSeconds,
     'fadeOutStartSeconds': fadeOutStartSeconds,

@@ -46,7 +46,7 @@ extension _ReactiveResolution on MediaRepository {
   /// Each source is materialized to a local file (reusing the audio materialize
   /// path) and the services are handed a [FileAudioSource] pointing at it, so
   /// the ffmpeg-backed decoder reads a real file while a test decoder ignores
-  /// the path. Idempotent: an already-analysed source is skipped.
+  /// the path. Reuses analysis that already covers the requested timing.
   Future<void> _resolveReactive(
     Iterable<AudioSource> sources, {
     required BeatDetectionService beatDetector,
@@ -55,20 +55,26 @@ extension _ReactiveResolution on MediaRepository {
     required int totalFrames,
   }) async {
     for (final source in sources) {
-      if (_beatGrids.containsKey(source)) continue;
+      final coverage = _reactiveCoverage[source];
+      if (coverage != null && coverage.fps == fps && coverage.totalFrames >= totalFrames) {
+        continue;
+      }
       final path = _audioPaths[source] ?? await _materializeAudio(source);
       _audioPaths[source] = path;
       final decodeSource = AudioSource.file(path);
-      _beatGrids[source] = await beatDetector.detect(
+      final beats = await beatDetector.detect(
         decodeSource,
         fps: fps,
         totalFrames: totalFrames,
       );
-      _bandTables[source] = await analyzer.analyze(
+      final bands = await analyzer.analyze(
         decodeSource,
         fps: fps,
         totalFrames: totalFrames,
       );
+      _beatGrids[source] = beats;
+      _bandTables[source] = bands;
+      _reactiveCoverage[source] = (fps: fps, totalFrames: totalFrames);
     }
   }
 }

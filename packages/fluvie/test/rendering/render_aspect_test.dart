@@ -151,7 +151,25 @@ void main() {
         resolver: FakeMediaResolver(const {}, audioPaths: {song: src.path}),
       );
       final graph = manifest.ffmpegArgs[manifest.ffmpegArgs.indexOf('-filter_complex') + 1];
-      expect(graph, contains('adelay=1000|1000'));
+      expect(graph, contains('adelay=1000:all=1'));
+    });
+
+    testWidgets('stages Scene.audio at the resolved scene start', (tester) async {
+      final src = _tempFile('scene.bin', const [1, 2, 3]);
+      final manifest = await _renderManifest(
+        tester,
+        video: Video(
+          scenes: const [
+            Scene(duration: Time.frames(60)),
+            Scene(duration: Time.frames(60), audio: [Audio.music('audio/song.mp3')]),
+          ],
+        ),
+        resolver: FakeMediaResolver(const {}, audioPaths: {song: src.path}),
+      );
+
+      final graph = manifest.ffmpegArgs[manifest.ffmpegArgs.indexOf('-filter_complex') + 1];
+      expect(graph, contains('adelay=2000:all=1'));
+      expect(graph, contains('apad[aout]'));
     });
 
     testWidgets('a Video with no audio keeps the -an plan', (tester) async {

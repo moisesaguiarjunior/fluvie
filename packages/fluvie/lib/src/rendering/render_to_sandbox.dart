@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/audio/encoding/resolved_audio_track.dart';
 import 'package:fluvie/src/composition/runtime/aspect_scope.dart';
 import 'package:fluvie/src/core/aspect.dart';
+import 'package:fluvie/src/core/contracts/clip_frame_preparer.dart';
 import 'package:fluvie/src/core/contracts/generative_resolver.dart'
     show GenerativeProgress, GenerativeResolver;
 import 'package:fluvie/src/core/contracts/media_resolver.dart' show MediaResolver;
@@ -107,6 +108,9 @@ Future<RenderManifest> renderToSandbox({
   // Pre-resolve declared media before the first pump: the capture shell paints
   // images synchronously from the `ImageResolverScope`, so the decoded cache
   // must be warm before the tree mounts (a null resolver = a media-less render).
+  final preparer = resolver != null && resolver is ClipFramePreparer
+      ? resolver as ClipFramePreparer
+      : null;
   final mediaWatch = metrics == null ? null : (Stopwatch()..start());
   try {
     await prepareCompositionMedia(
@@ -116,6 +120,7 @@ Future<RenderManifest> renderToSandbox({
       generative: generative,
       onGenerativeProgress: onGenerativeProgress,
     );
+    await preparer?.prepareClipFrames(0);
   } finally {
     if (mediaWatch != null) {
       mediaWatch.stop();
@@ -153,6 +158,7 @@ Future<RenderManifest> renderToSandbox({
   final encodeFrame = frameEncoder;
   final framesArePng = encodeFrame != null;
   Future<void> pump(int frame) async {
+    await preparer?.prepareClipFrames(frame);
     controller.seek(frame);
     await pumpFrame();
   }

@@ -38,7 +38,7 @@ void main() {
   }
 
   group('stageAudioMix — the sfx delay (WI-23)', () {
-    test('an sfx at 1s stages adelay=1000|1000 at 30fps', () async {
+    test('an sfx at 1s stages adelay=1000:all=1 at 30fps', () async {
       const pop = AudioSource.asset('audio/pop.wav');
       final resolver = await resolverFor(pop, 'pop.bin');
 
@@ -52,7 +52,7 @@ void main() {
 
       final node = plan.tracks.single;
       expect(node.delayMs, 1000);
-      expect(node.filterChain(inputIndex: 1, label: 'a0'), contains('adelay=1000|1000'));
+      expect(node.filterChain(inputIndex: 1, label: 'a0'), contains('adelay=1000:all=1'));
     });
 
     test('an sfx fired by an absolute frame resolves to the right ms', () async {

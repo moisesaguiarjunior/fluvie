@@ -27,6 +27,7 @@ import 'package:fluvie/src/timing/scene_scope.dart';
 import 'package:fluvie/src/timing/schedule/composition_registrar_scope.dart';
 import 'package:fluvie/src/timing/timeline/resolved_timeline.dart';
 import 'package:fluvie/src/timing/video_scope.dart';
+import 'package:meta/meta.dart';
 
 part 'video_state.dart';
 
@@ -141,14 +142,14 @@ final class Video extends StatefulWidget {
   /// a scene's length defines the window relative times
   /// measure against, so it cannot be a fraction of itself — or when a
   /// transition duration is relative (a boundary sits between two scenes).
-  int get totalFrames => _offsets.totalFrames;
+  int get totalFrames => sceneOffsets.totalFrames;
 
   /// The frame each scene starts on, in scene order, via the shared layout
   /// math; the first is always `0`. An overlapping transition
   /// starts the next scene early.
   ///
   /// Throws like [totalFrames] on a relative scene or transition duration.
-  List<int> get sceneStartFrames => _offsets.startFrames;
+  List<int> get sceneStartFrames => sceneOffsets.startFrames;
 
   /// The per-boundary transitions after the precedence resolution: each
   /// scene's `enter` beats the previous scene's `exit`, which beats
@@ -162,7 +163,8 @@ final class Video extends StatefulWidget {
   /// and blend windows, resolved against the precedence-collapsed boundaries.
   /// Both the getters above and the [VideoState] shell read this same call, so
   /// the widget tree and the timing resolver can never disagree.
-  SceneOffsets get _offsets => resolveSceneOffsets(
+  @internal
+  SceneOffsets get sceneOffsets => resolveSceneOffsets(
     fps: fps,
     durations: [for (final scene in scenes) scene.duration],
     transitions: _boundaryTransitions,
