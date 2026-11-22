@@ -17,6 +17,24 @@ typedef SceneOffsets = ({
   int totalFrames,
 });
 
+/// Accesses the held outgoing window used by the transition compositor.
+extension SceneOffsetHold on SceneOffsets {
+  /// The absolute blend window and frozen frame for a non-overlap boundary.
+  ({int start, int end, int frame})? outgoingHold(int sceneIndex) {
+    if (sceneIndex >= transitionFrames.length ||
+        overlaps[sceneIndex] ||
+        transitionFrames[sceneIndex] == 0) {
+      return null;
+    }
+    final start = startFrames[sceneIndex + 1];
+    return (
+      start: start,
+      end: start + transitionFrames[sceneIndex],
+      frame: start - 1,
+    );
+  }
+}
+
 /// Resolves every scene start, duration, and transition window to frames at
 /// [fps] — the single source of offset math.
 ///

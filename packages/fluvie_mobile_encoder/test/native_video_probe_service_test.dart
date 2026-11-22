@@ -21,6 +21,7 @@ void main() {
         'height': 720,
         'frameCount': 150,
         'durationMs': 5000,
+        'hasAudio': true,
       };
     });
 
@@ -33,6 +34,7 @@ void main() {
     expect(result.height, 720);
     expect(result.nbFrames, 150);
     expect(result.durationSeconds, 5.0);
+    expect(result.hasAudio, isTrue);
   });
 
   test('probe falls back to defaults when the facts omit fields', () async {
@@ -45,6 +47,7 @@ void main() {
     expect(result.height, 0);
     expect(result.nbFrames, 0);
     expect(result.durationSeconds, 0.0);
+    expect(result.hasAudio, isFalse);
   });
 
   test('probe caps an oversized clip to the long-edge bound', () async {

@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:fluvie/src/composition/runtime/audio_collector.dart';
+import 'package:fluvie/src/composition/runtime/reactive_audio_window.dart';
 import 'package:fluvie/src/composition/video.dart';
 import 'package:fluvie/src/core/anchor.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
+import 'package:fluvie/src/timing/time_scope_data.dart';
 
 /// The reactive audio tracks a composition declares, gathered for the
 /// pre-resolve pass.
@@ -17,6 +21,8 @@ final class ReactiveTracks {
     required this.byAnchor,
     required this.defaultSource,
     required this.allSources,
+    this.defaultWindow,
+    this.windows = const {},
   });
 
   /// Per-track sources keyed by the `Audio.track` anchor.
@@ -27,6 +33,18 @@ final class ReactiveTracks {
 
   /// The deduplicated set of sources to analyse before frame 0.
   final Set<AudioSource> allSources;
+
+  /// Playback window for the default source when declared by a scene.
+  final ReactiveAudioWindow? defaultWindow;
+
+  /// Scene playback windows by authored track anchor.
+  final Map<Anchor, ReactiveAudioWindow> windows;
+
+  /// Includes enough source analysis to read trimmed scene tracks.
+  int analysisFrames(int frameCount) => [
+    ?defaultWindow,
+    ...windows.values,
+  ].fold(frameCount, (frames, window) => math.max(frames, window.analysisFrames));
 }
 
 /// Gathers every reactive audio track [video] declares — a pure structural read
@@ -37,16 +55,35 @@ final class ReactiveTracks {
 /// anchor is also mapped by that anchor so a `track:`-scoped effect reads its
 /// own table. The set is deduplicated so two tracks naming one origin analyse
 /// once.
-ReactiveTracks collectReactiveTracks(Video video) {
-  final tracks = collectAudioTracks(video);
+ReactiveTracks collectReactiveTracks(Video video, {int? frameCount}) {
+  final placements = collectAudioPlacements(video);
+  final defaultSource = placements.isEmpty ? null : placements.first.track.audioSource;
   final byAnchor = <Anchor, AudioSource>{};
-  for (final track in tracks) {
+  final windows = <Anchor, ReactiveAudioWindow>{};
+  ReactiveAudioWindow? defaultWindow;
+  final offsets = video.sceneOffsets;
+  final duration = frameCount ?? offsets.totalFrames;
+  final scope = TimeScopeData(fps: video.fps, startFrame: 0, durationFrames: duration);
+  for (final (index, (:track, :sceneIndex)) in placements.indexed) {
     final anchor = track.track;
-    if (anchor != null) byAnchor[anchor] = track.audioSource;
+    if (anchor != null) {
+      byAnchor[anchor] = track.audioSource;
+      windows.remove(anchor);
+    }
+    if (sceneIndex == null || (index != 0 && anchor == null)) continue;
+    final window = ReactiveAudioWindow(
+      resolveAudioPlacement(track, sceneIndex: sceneIndex, offsets: offsets, scope: scope),
+      duration,
+      fps: video.fps,
+    );
+    if (index == 0) defaultWindow = window;
+    if (anchor != null) windows[anchor] = window;
   }
   return ReactiveTracks(
     byAnchor: byAnchor,
-    defaultSource: tracks.isEmpty ? null : tracks.first.audioSource,
-    allSources: {for (final track in tracks) track.audioSource},
+    defaultSource: defaultSource,
+    allSources: {for (final placement in placements) placement.track.audioSource},
+    defaultWindow: defaultWindow,
+    windows: windows,
   );
 }

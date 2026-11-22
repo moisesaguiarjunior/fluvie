@@ -48,6 +48,7 @@ final class SpectralFrequencyAnalyzer implements FrequencyAnalyzer {
       sampleRate: pcm.sampleRate,
       fps: fps,
       totalFrames: totalFrames,
+      sourceFrames: pcm.samples.length * fps / pcm.sampleRate,
     );
     _cache[key] = table;
     return table;

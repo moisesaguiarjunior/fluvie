@@ -14,6 +14,7 @@ data class AudioTrackSpec(
   val volume: Float,
   val trimStartSeconds: Double?,
   val trimEndSeconds: Double?,
+  val maxPlaybackSeconds: Double?,
   val fadeInSeconds: Double?,
   val fadeOutSeconds: Double?,
   val fadeOutStartSeconds: Double,
@@ -26,6 +27,7 @@ data class AudioTrackSpec(
       volume = (map["volume"] as Number).toFloat(),
       trimStartSeconds = (map["trimStartSeconds"] as Number?)?.toDouble(),
       trimEndSeconds = (map["trimEndSeconds"] as Number?)?.toDouble(),
+      maxPlaybackSeconds = (map["maxPlaybackSeconds"] as Number?)?.toDouble(),
       fadeInSeconds = (map["fadeInSeconds"] as Number?)?.toDouble(),
       fadeOutSeconds = (map["fadeOutSeconds"] as Number?)?.toDouble(),
       fadeOutStartSeconds = (map["fadeOutStartSeconds"] as Number?)?.toDouble() ?: 0.0,
@@ -50,50 +52,48 @@ class AudioMixEncoder(
   fun encodeTo(outputPath: String) {
     val totalFrames = (durationSeconds * SAMPLE_RATE).toInt()
     val mix = FloatArray(totalFrames * CHANNELS)
-    for (spec in tracks) mixOne(spec, mix, totalFrames)
+    for (spec in tracks) mixOne(spec, PcmAudioDecoder.decode(spec.path), mix, totalFrames)
     encodeAac(mix, outputPath)
   }
 
-  private fun mixOne(spec: AudioTrackSpec, mix: FloatArray, totalFrames: Int) {
-    val pcm = PcmAudioDecoder.decode(spec.path)
+  internal fun mixOne(spec: AudioTrackSpec, pcm: DecodedPcm, mix: FloatArray, totalFrames: Int) {
     val gain = spec.volume * masterVolume
     val sourceFrames = if (pcm.channels == 0) 0 else pcm.samples.size / pcm.channels
     if (sourceFrames == 0) return
 
     val trimStart = ((spec.trimStartSeconds ?: 0.0) * pcm.sampleRate).toInt()
-    val trimEnd = spec.trimEndSeconds?.let { (it * pcm.sampleRate).toInt() } ?: sourceFrames
+      .coerceIn(0, sourceFrames)
+    val trimEnd = spec.trimEndSeconds?.let { (it * pcm.sampleRate).toInt() }
+      ?.coerceIn(0, sourceFrames) ?: sourceFrames
+    val trimLength = trimEnd - trimStart
+    if (trimLength <= 0) return
+
     val delayFrames = (spec.delayMs / 1000.0 * SAMPLE_RATE).toInt()
+    if (delayFrames !in 0 until totalFrames) return
+    val remainingFrames = totalFrames - delayFrames
+    val playbackFrames = spec.maxPlaybackSeconds?.let {
+      (it * SAMPLE_RATE).toInt().coerceIn(0, remainingFrames)
+    } ?: remainingFrames
     val fadeInFrames = ((spec.fadeInSeconds ?: 0.0) * SAMPLE_RATE).toInt()
     val fadeOutFrames = ((spec.fadeOutSeconds ?: 0.0) * SAMPLE_RATE).toInt()
     val fadeOutStart = (spec.fadeOutStartSeconds * SAMPLE_RATE).toInt()
 
-    var dst = delayFrames
-    var pos = trimStart
-    while (dst in 0 until totalFrames) {
-      if (pos >= trimEnd || pos >= sourceFrames) {
-        if (spec.loop && trimEnd > trimStart) {
-          pos = trimStart
-          continue
-        }
-        break
-      }
-      val sourceFrame = (pos.toLong() * pcm.sampleRate / SAMPLE_RATE).toInt()
-      if (sourceFrame >= sourceFrames) break
+    val downmix = StereoDownmix(pcm.channels, pcm.channelMask)
+    for (rel in 0 until playbackFrames) {
+      // Trim and wrap in source frames. The output clock advances once per sample.
+      val advanced = rel.toLong() * pcm.sampleRate / SAMPLE_RATE
+      if (!spec.loop && advanced >= trimLength) break
+      val offset = if (spec.loop) advanced % trimLength else advanced
+      val sourceFrame = trimStart + offset.toInt()
+      val dst = delayFrames + rel
 
       var envelope = gain
-      val rel = dst - delayFrames
       if (fadeInFrames > 0 && rel < fadeInFrames) envelope *= rel.toFloat() / fadeInFrames
       if (fadeOutFrames > 0 && rel >= fadeOutStart) {
         val into = rel - fadeOutStart
         envelope *= (1f - into.toFloat() / fadeOutFrames).coerceIn(0f, 1f)
       }
-      for (ch in 0 until CHANNELS) {
-        val sourceChannel = if (pcm.channels == 1) 0 else ch
-        val sample = pcm.samples[sourceFrame * pcm.channels + sourceChannel] / 32768f
-        mix[dst * CHANNELS + ch] += sample * envelope
-      }
-      dst++
-      pos++
+      downmix.mix(pcm.samples, sourceFrame * pcm.channels, mix, dst * CHANNELS, envelope)
     }
   }
 

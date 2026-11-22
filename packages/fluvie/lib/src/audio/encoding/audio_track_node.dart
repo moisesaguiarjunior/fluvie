@@ -26,6 +26,7 @@ final class AudioTrackNode implements FfmpegAudioNode {
     this.delayMs = 0,
     this.trimStartSeconds,
     this.trimEndSeconds,
+    this.maxPlaybackSeconds,
     this.volume = 1,
     this.fadeInSeconds,
     this.fadeOutSeconds,
@@ -47,6 +48,7 @@ final class AudioTrackNode implements FfmpegAudioNode {
         volume: resolved.volume,
         trimStartSeconds: resolved.trimStartSeconds,
         trimEndSeconds: resolved.trimEndSeconds,
+        maxPlaybackSeconds: resolved.maxPlaybackSeconds,
         fadeInSeconds: resolved.fadeInSeconds,
         fadeOutSeconds: resolved.fadeOutSeconds,
         fadeOutStartSeconds: resolved.fadeOutStartSeconds,
@@ -67,6 +69,9 @@ final class AudioTrackNode implements FfmpegAudioNode {
 
   /// The linear gain applied to the track (`1` plays as authored).
   final double volume;
+
+  /// Caps playback after any repeats and before inserting the delay.
+  final double? maxPlaybackSeconds;
 
   /// How long the track ramps in from silence, in seconds; `null` for no fade.
   final double? fadeInSeconds;
@@ -114,9 +119,14 @@ final class AudioTrackNode implements FfmpegAudioNode {
       if (_hasTrim) _atrim(),
       'asetpts=PTS-STARTPTS',
       if (loop && _hasTrim) 'aloop=loop=-1:size=$_loopSampleBudget',
-      if (delayMs > 0) 'adelay=$delayMs|$delayMs',
+      if (maxPlaybackSeconds != null) 'atrim=duration=${formatFilterNumber(maxPlaybackSeconds!)}',
+      if (delayMs > 0) 'adelay=$delayMs:all=1',
+      // A trim can leave a partial first audio frame. Rebuild contiguous
+      // timestamps after inserting silence so amix sees the delayed samples.
+      if (delayMs > 0 && (trimStartSeconds ?? 0) > 0) 'asetpts=N/SR/TB',
       'volume=${formatFilterNumber(volume)}',
-      if (fadeInSeconds != null) 'afade=t=in:st=0:d=${formatFilterNumber(fadeInSeconds!)}',
+      if (fadeInSeconds != null)
+        'afade=t=in:st=${formatFilterNumber(delayMs / 1000)}:d=${formatFilterNumber(fadeInSeconds!)}',
       if (fadeOutSeconds != null) _fadeOut(),
     ];
     return '[$inputIndex:a]${filters.join(',')}[$label]';
@@ -128,7 +138,7 @@ final class AudioTrackNode implements FfmpegAudioNode {
   static const int _loopSampleBudget = 1073741824;
 
   String _fadeOut() {
-    final start = formatFilterNumber(fadeOutStartSeconds);
+    final start = formatFilterNumber(fadeOutStartSeconds + delayMs / 1000);
     final duration = formatFilterNumber(fadeOutSeconds!);
     return 'afade=t=out:st=$start:d=$duration';
   }

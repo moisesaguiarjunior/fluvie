@@ -32,6 +32,7 @@ import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture.dart';
 import 'package:fluvie/src/elements/snapshot/runtime/snapshot_capture_scope.dart';
 import 'package:fluvie/src/media/render_resolver_scope.dart';
 import 'package:fluvie/src/media/runtime/image_resolver_scope.dart';
+import 'package:fluvie/src/rendering/audio_mix_resolution.dart' show resolveDeclaredAudioTracks;
 import 'package:fluvie/src/rendering/capture/capture_shell.dart';
 import 'package:fluvie/src/rendering/capture/frame_capture_service.dart';
 import 'package:fluvie/src/rendering/capture/raw_frame.dart';
@@ -245,7 +246,7 @@ Future<RenderManifest> renderVideo({
   final mediaSources = collectMediaSources(video.scenes);
   final snapshotSources = collectSnapshotSources(video.scenes);
   final captionSource = collectCaptionSource(video);
-  final reactiveTracks = collectReactiveTracks(video);
+  final reactiveTracks = collectReactiveTracks(video, frameCount: frameCount);
   final declaresMedia =
       mediaSources.isNotEmpty ||
       snapshotSources.isNotEmpty ||
@@ -285,7 +286,7 @@ Future<RenderManifest> renderVideo({
               beatDetector: beatDetector ?? SpectralBeatDetectionService(),
               analyzer: analyzer ?? SpectralFrequencyAnalyzer(),
               fps: config.fps,
-              totalFrames: frameCount,
+              totalFrames: reactiveTracks.analysisFrames(frameCount),
             );
           }
         }
@@ -521,15 +522,18 @@ Never _missingSnapshotService() => throw StateError(
   required int fps,
   required int totalFrames,
 }) {
-  final tracks = collectAudioTracks(video);
+  final tracks = resolveDeclaredAudioTracks(video, fps: fps, totalFrames: totalFrames);
   // Only clips that actually carry an audio track join the mix (each was probed
   // above); a silent clip would otherwise fail the encoder's `[N:a]` map.
-  final clipPlans = resolver == null
+  final clipMetadataFor = resolver?.clipMetadataFor;
+  final clipPlans = clipMetadataFor == null
       ? const <ClipAudioPlan>[]
       : collectClipAudioPlans(
           video.scenes,
-          fps,
-        ).where((plan) => resolver.clipMetadataFor(plan.source).hasAudio).toList();
+          video.fps,
+          sceneStartFrames: video.sceneStartFrames,
+          videoFrames: video.totalFrames,
+        ).where((plan) => clipMetadataFor(plan.source).hasAudio).toList();
   if (tracks.isEmpty && clipPlans.isEmpty) {
     return (stageAudio: null, audioSources: const []);
   }
@@ -539,17 +543,16 @@ Never _missingSnapshotService() => throw StateError(
       // the same amix as the declared tracks.
       final clipNodes = await stageClipAudio(
         plans: clipPlans,
+        clipMetadataFor: clipMetadataFor,
         resolver: resolver,
         sandbox: sandbox,
         fps: fps,
         totalFrames: totalFrames,
       );
-      final plan = await stageAudioMix(
+      final plan = await stageResolvedAudioMix(
         tracks: tracks,
         resolver: resolver,
         sandbox: sandbox,
-        fps: fps,
-        totalFrames: totalFrames,
         extraNodes: clipNodes,
       );
       return (nodes: plan.tracks, amix: plan.amix);

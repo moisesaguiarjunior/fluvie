@@ -1,6 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope.dart';
+import 'package:fluvie/src/composition/runtime/reactive_audio_window.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
+import 'package:fluvie/src/core/audio/audio_source.dart';
+import 'package:fluvie/src/core/audio/band_table.dart';
 import 'package:fluvie/src/core/contracts/media_resolver.dart';
 
 /// Wraps [child] in a [ReactiveScope] carrying the precomputed band tables for
@@ -15,10 +18,16 @@ import 'package:fluvie/src/core/contracts/media_resolver.dart';
 Widget reactiveScopeFor(ReactiveTracks tracks, MediaResolver resolver, Widget child) {
   final defaultSource = tracks.defaultSource;
   if (defaultSource == null) return child;
+  BandTable tableFor(AudioSource source, ReactiveAudioWindow? window) {
+    final table = resolver.bandTableFor(source);
+    return window?.placeBands(table) ?? table;
+  }
+
   return ReactiveScope(
-    table: resolver.bandTableFor(defaultSource),
+    table: tableFor(defaultSource, tracks.defaultWindow),
     tracks: {
-      for (final entry in tracks.byAnchor.entries) entry.key: resolver.bandTableFor(entry.value),
+      for (final entry in tracks.byAnchor.entries)
+        entry.key: tableFor(entry.value, tracks.windows[entry.key]),
     },
     child: child,
   );

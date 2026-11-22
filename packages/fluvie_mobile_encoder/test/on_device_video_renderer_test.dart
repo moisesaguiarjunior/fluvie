@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fluvie/fluvie.dart';
@@ -61,6 +62,17 @@ class _TrackingResolver implements MediaResolver, DisposableResolver {
   dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }
 
+class _FrameRecordingEncoder implements MobileVideoEncoder {
+  final fake = FakeMobileVideoEncoder();
+  late List<int> capturedFrames;
+
+  @override
+  Future<void> encode(MobileEncodeRequest request) async {
+    capturedFrames = await File(request.framesPath).readAsBytes();
+    await fake.encode(request);
+  }
+}
+
 Directory _sandbox() {
   final dir = Directory.systemTemp.createTempSync('mob_render_');
   addTearDown(() => dir.deleteSync(recursive: true));
@@ -72,7 +84,7 @@ const Widget _composition = ColoredBox(color: Color(0xFF112233));
 void main() {
   testWidgets('captures a composition and encodes it to out.mp4', (tester) async {
     final sandbox = _sandbox();
-    final encoder = FakeMobileVideoEncoder();
+    final encoder = _FrameRecordingEncoder();
     late _TesterCaptureHost host;
     final renderer = OnDeviceVideoRenderer(
       encoder: encoder,
@@ -95,27 +107,34 @@ void main() {
     expect(file!.path, endsWith('out.mp4'));
     expect(phases, [RenderPhase.capturing, RenderPhase.encoding, RenderPhase.complete]);
     expect(host.disposed, isTrue);
-    expect(encoder.requests, hasLength(1));
+    expect(encoder.fake.requests, hasLength(1));
 
-    final req = encoder.requests.single;
+    final req = encoder.fake.requests.single;
     expect(req.width, 64);
     expect(req.height, 64);
     expect(req.fps, 30);
     expect(req.frameCount, 3);
     expect(req.codec, MobileVideoCodec.h264);
     expect(req.bitRate, defaultBitRate(width: 64, height: 64, fps: 30));
-    expect(File(req.framesPath).existsSync(), isTrue);
-    expect(File(req.framesPath).lengthSync(), 3 * 64 * 64 * 4);
+    expect(encoder.capturedFrames, hasLength(3 * 64 * 64 * 4));
+    expect(File(req.framesPath).existsSync(), isFalse);
+    expect(file.existsSync(), isTrue);
   });
 
   testWidgets('metrics leave the captured frames identical and time the encode', (tester) async {
     final timedSandbox = _sandbox();
     final plainSandbox = _sandbox();
     final report = RenderMetrics();
+    final timedEncoder = _FrameRecordingEncoder();
+    final plainEncoder = _FrameRecordingEncoder();
 
-    Future<void> shoot(Directory sandbox, RenderMetrics? metrics) {
+    Future<void> shoot(
+      Directory sandbox,
+      _FrameRecordingEncoder encoder,
+      RenderMetrics? metrics,
+    ) {
       final renderer = OnDeviceVideoRenderer(
-        encoder: FakeMobileVideoEncoder(),
+        encoder: encoder,
         hostFactory: (size) => _TesterCaptureHost(tester, size),
         sandboxFactory: () async => sandbox,
       );
@@ -129,8 +148,8 @@ void main() {
     }
 
     await tester.runAsync(() async {
-      await shoot(timedSandbox, report);
-      await shoot(plainSandbox, null);
+      await shoot(timedSandbox, timedEncoder, report);
+      await shoot(plainSandbox, plainEncoder, null);
     });
 
     expect(report.frameCount, 3);
@@ -145,10 +164,7 @@ void main() {
     expect(report.encoding.samples, 1);
     expect(report.cacheHits, 0);
     expect(report.cacheMisses, 0);
-    expect(
-      File('${timedSandbox.path}/frames.rgba').readAsBytesSync(),
-      File('${plainSandbox.path}/frames.rgba').readAsBytesSync(),
-    );
+    expect(timedEncoder.capturedFrames, plainEncoder.capturedFrames);
   });
 
   testWidgets('never disposes a caller-injected media resolver', (tester) async {
@@ -200,7 +216,8 @@ void main() {
 
   testWidgets('writes the MP4 to an explicit outputFile', (tester) async {
     final sandbox = _sandbox();
-    final dest = File('${sandbox.path}/custom_name.mp4');
+    final dest = File('${_sandbox().path}/custom_name.mp4');
+    final otherFile = File('${sandbox.path}/frames.rgba')..writeAsBytesSync(const [42]);
     final encoder = FakeMobileVideoEncoder();
     final renderer = OnDeviceVideoRenderer(
       encoder: encoder,
@@ -220,6 +237,9 @@ void main() {
 
     expect(file!.path, dest.path);
     expect(encoder.requests.single.outputPath, dest.path);
+    expect(dest.existsSync(), isTrue);
+    expect(File(encoder.requests.single.framesPath).parent.existsSync(), isFalse);
+    expect(otherFile.readAsBytesSync(), [42]);
   });
 
   testWidgets('a cleanup failure is reported, not masked, and the render succeeds', (tester) async {
@@ -312,6 +332,7 @@ void main() {
     });
 
     expect(host.disposed, isTrue);
+    expect(File(encoder.requests.single.framesPath).parent.existsSync(), isFalse);
   });
 
   test('rejects a non-positive fps', () {
@@ -351,32 +372,100 @@ void main() {
       ],
     );
 
-    testWidgets('materializes, mixes, and muxes audio when opted in', (tester) async {
-      final sandbox = _sandbox();
-      final encoder = FakeMobileVideoEncoder();
-      final materializer = _FakeMaterializer();
-      final renderer = OnDeviceVideoRenderer(
-        encoder: encoder,
-        hostFactory: (size) => _TesterCaptureHost(tester, size),
-        sandboxFactory: () async => sandbox,
-        audioMaterializer: materializer,
-      );
+    for (final wrapped in [false, true]) {
+      final description = wrapped ? 'wrapped Video' : 'bare Video';
+      testWidgets('materializes, mixes, and muxes audio when opted in ($description)', (
+        tester,
+      ) async {
+        final sandbox = _sandbox();
+        final encoder = FakeMobileVideoEncoder();
+        final materializer = _FakeMaterializer();
+        final renderer = OnDeviceVideoRenderer(
+          encoder: encoder,
+          hostFactory: (size) => _TesterCaptureHost(tester, size),
+          sandboxFactory: () async => sandbox,
+          audioMaterializer: materializer,
+        );
 
-      await tester.runAsync(
-        () => renderer.render(
-          composition: audioVideo(),
-          aspect: Aspect.square,
-          duration: const Duration(milliseconds: 100),
-          longEdge: 64,
-          audio: true,
-        ),
-      );
+        final video = audioVideo();
+        final composition = wrapped
+            ? Directionality(textDirection: TextDirection.ltr, child: video)
+            : video;
+        await tester.runAsync(
+          () => renderer.render(
+            composition: composition,
+            aspect: Aspect.square,
+            duration: const Duration(milliseconds: 100),
+            longEdge: 64,
+            audio: true,
+          ),
+        );
 
-      expect(materializer.materialized, ['audio/song.mp3']);
-      final req = encoder.requests.single;
-      expect(req.audioTracks, hasLength(1));
-      expect(req.audioTracks.single.path, '/materialized/audio/song.mp3');
-      expect(req.audioMasterVolume, 1);
+        expect(materializer.materialized, ['audio/song.mp3']);
+        final req = encoder.requests.single;
+        expect(req.audioTracks, hasLength(1));
+        expect(req.audioTracks.single.path, '/materialized/audio/song.mp3');
+        expect(req.audioMasterVolume, 1);
+      });
+    }
+
+    group('embedded clip audio', () {
+      const channel = MethodChannel('dev.fluvie/mobile_encoder');
+      tearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        );
+      });
+
+      for (final hasAudio in [false, true]) {
+        testWidgets('only materializes a clip track when the probe finds audio ($hasAudio)', (
+          tester,
+        ) async {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'probeVideo') {
+              return {
+                'width': 16,
+                'height': 16,
+                'frameCount': 30,
+                'durationMs': 1000,
+                'hasAudio': hasAudio,
+              };
+            }
+            expect(call.method, 'extractFrames');
+            final args = call.arguments as Map<Object?, Object?>;
+            final indices = args['indices']! as List<Object?>;
+            return Uint8List(indices.length * 16 * 16 * 4);
+          });
+          final sandbox = _sandbox();
+          final clip = File('${sandbox.path}/clip.mp4')..writeAsBytesSync([1]);
+          final encoder = FakeMobileVideoEncoder();
+          final materializer = _FakeMaterializer();
+          final renderer = OnDeviceVideoRenderer(
+            encoder: encoder,
+            hostFactory: (size) => _TesterCaptureHost(tester, size),
+            sandboxFactory: () async => sandbox,
+            audioMaterializer: materializer,
+          );
+
+          final result = await tester.runAsync(
+            () => renderer.render(
+              composition: Video(
+                scenes: [
+                  Scene(duration: const Time.frames(3), children: [Clip.file(clip.path)]),
+                ],
+              ),
+              aspect: Aspect.square,
+              duration: const Duration(milliseconds: 100),
+              longEdge: 16,
+              audio: true,
+            ),
+          );
+          expect(result!.existsSync(), isTrue);
+          expect(encoder.requests.single.audioTracks, hasLength(hasAudio ? 1 : 0));
+          expect(materializer.materialized, hasAudio ? [clip.path] : isEmpty);
+        });
+      }
     });
 
     testWidgets('warns once when a Video has audio but audio is off', (tester) async {

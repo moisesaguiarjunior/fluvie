@@ -39,13 +39,12 @@ final class DesktopVideoRenderer implements VideoRenderer<File> {
     required this.pumpWidget,
     required this.pumpFrame,
     FfmpegRunner? runner,
-    RenderService? service,
+    this._service,
     Future<Directory> Function()? sandboxFactory,
     void Function(String message)? onWarning,
     this.mediaResolver,
     this.networkAllowlist,
   }) : _runner = runner ?? ProcessFfmpegRunner(),
-       _service = service ?? RenderService(capture: const RepaintBoundaryCaptureService()),
        _sandboxFactory = sandboxFactory ?? _defaultSandboxFactory,
        _onWarning = onWarning ?? _defaultWarn;
 
@@ -63,7 +62,7 @@ final class DesktopVideoRenderer implements VideoRenderer<File> {
   final capture.ShellFramePump pumpFrame;
 
   final FfmpegRunner _runner;
-  final RenderService _service;
+  final RenderService? _service;
   final Future<Directory> Function() _sandboxFactory;
 
   /// The injected media resolver, or null to build (and dispose) one per
@@ -103,14 +102,17 @@ final class DesktopVideoRenderer implements VideoRenderer<File> {
         RenderPhase.capturing,
         () => capture.render(
           // The host mounts this with no app ancestors, so the tree needs an
-          // ambient Directionality for Text/RichText to lay out. Audio is
-          // collected from the raw Video by the capture entry itself, so the
-          // wrap is mount-only.
+          // ambient Directionality for Text/RichText to lay out.
           composition: Directionality(textDirection: TextDirection.ltr, child: composition),
           aspect: aspect,
           frameCount: frameCount,
           outDir: sandbox,
-          service: _service,
+          service:
+              _service ??
+              RenderService(
+                capture: const RepaintBoundaryCaptureService(),
+                media: scope.resolver,
+              ),
           pumpWidget: pumpWidget,
           pumpFrame: pumpFrame,
           longEdge: longEdge,

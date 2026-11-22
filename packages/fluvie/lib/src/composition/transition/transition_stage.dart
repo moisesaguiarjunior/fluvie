@@ -113,7 +113,7 @@ SceneFrameState _stateFor(int s, int frame, SceneOffsets offsets, List<Transitio
         role: SceneRole.outgoing,
         progress: p,
         boundary: s,
-        holdFrame: offsets.overlaps[s] ? null : starts[s + 1] - 1,
+        holdFrame: offsets.outgoingHold(s)?.frame,
       );
     }
   }

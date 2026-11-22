@@ -1,8 +1,11 @@
 import 'package:flutter/widgets.dart' show Widget;
 import 'package:fluvie/src/audio/encoding/resolved_audio_track.dart';
 import 'package:fluvie/src/composition/video.dart';
+import 'package:fluvie/src/core/contracts/media_resolver.dart';
 import 'package:fluvie/src/core/export.dart';
+import 'package:fluvie/src/core/media/media_source.dart';
 import 'package:fluvie/src/rendering/audio_mix_resolution.dart';
+import 'package:fluvie/src/rendering/collect_composition_media.dart' show compositionVideo;
 
 /// The one audio-drop policy the on-device and in-browser renderers share.
 ///
@@ -10,8 +13,8 @@ import 'package:fluvie/src/rendering/audio_mix_resolution.dart';
 /// `false`, a [Video] that declares `Audio` yields no mix and warns once
 /// through [warnSink] (unless [warn] silences it), naming the platform via
 /// [platformLabel] ("on-device", "in-browser"). A non-MP4 [export] cannot
-/// carry audio, so it also yields no mix, with its own warning. A non-[Video]
-/// composition or one with no declared audio yields `null` silently.
+/// carry audio, so it also yields no mix, with its own warning. A composition
+/// without a [Video] or without declared audio yields `null` silently.
 ///
 /// With the opt-in on and an MP4 target, returns the [ResolvedAudioMix] the
 /// renderer stages into its encoder.
@@ -24,9 +27,16 @@ ResolvedAudioMix? gateOptInAudio({
   required void Function(String message) warnSink,
   required String platformLabel,
   Export? export,
+  ClipMetadata Function(MediaSource)? clipMetadataFor,
 }) {
-  if (composition is! Video) return null;
-  final mix = resolveAudioMix(video: composition, fps: fps, totalFrames: frameCount);
+  final video = compositionVideo(composition);
+  if (video == null) return null;
+  final mix = resolveAudioMix(
+    video: video,
+    fps: fps,
+    totalFrames: frameCount,
+    clipMetadataFor: clipMetadataFor,
+  );
   if (mix.isEmpty) return null;
   if (!encode) {
     if (warn) {

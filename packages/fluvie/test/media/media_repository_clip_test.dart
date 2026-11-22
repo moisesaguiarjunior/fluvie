@@ -7,8 +7,11 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show SizedBox;
+import 'package:flutter/widgets.dart' show Size, SizedBox;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fluvie/fluvie.dart' show Aspect, Clip, Scene, Time, Transition, Video;
+import 'package:fluvie/rendering.dart'
+    show MemoryRenderSandbox, RepaintBoundaryCaptureService, renderToSandbox;
 import 'package:fluvie/src/core/errors/fluvie_render_exception.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
 import 'package:fluvie/src/media/media_bytes_loader.dart';
@@ -20,6 +23,7 @@ import 'package:fluvie/src/rendering/capture/raw_frame.dart';
 import 'package:fluvie/src/rendering/encoding/frame_extraction_service.dart';
 import 'package:fluvie/src/rendering/encoding/video_probe_service.dart';
 import 'package:fluvie/src/rendering/pre_resolve_clips.dart';
+import 'package:fluvie/src/rendering/render_frame.dart';
 
 class _MapBundle extends CachingAssetBundle {
   _MapBundle(this._data);
@@ -127,6 +131,45 @@ const _probeResult = VideoProbeResult(
 );
 
 void main() {
+  testWidgets('a still warms the held outgoing clip frame in a non-overlap blend', (tester) async {
+    tester.view
+      ..physicalSize = const Size(16, 16)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final extractor = _FakeExtractor();
+    final repo = _repo(
+      assets: {'clip_1s.mp4': Uint8List(16)},
+      probe: _FakeProbe(_probeResult),
+      extractor: extractor,
+      clipFrameStore: _MemoryClipStore(),
+    );
+    addTearDown(repo.dispose);
+    final video = Video(
+      transition: const Transition.crossFade(Time.frames(4), overlap: false),
+      scenes: [
+        Scene(duration: const Time.frames(10), children: [Clip.asset('clip_1s.mp4')]),
+        const Scene(duration: Time.frames(10), children: [SizedBox()]),
+      ],
+    );
+
+    Future<RawFrame> shoot({bool stepThrough = false}) => captureFrame(
+      composition: video,
+      aspect: Aspect.square,
+      frame: 12,
+      longEdge: 16,
+      resolver: repo,
+      pumpWidget: tester.pumpWidget,
+      pumpFrame: tester.pump,
+      stepThrough: stepThrough,
+    );
+
+    final direct = (await tester.runAsync(shoot))!;
+    expect(extractor.extracted, [0, 9]);
+    final sequential = (await tester.runAsync(() => shoot(stepThrough: true)))!;
+    expect(direct.rgba, sequential.rgba);
+  });
+
   test('streaming warms distinct placements and keeps them across a source refresh', () async {
     final store = _MemoryClipStore();
     final extractor = _FakeExtractor();
@@ -158,15 +201,8 @@ void main() {
     expect(repo.decodedClipFrame(_clip, 1).width, 2);
     expect(repo.decodedClipFrame(_clip, 11).width, 2);
 
-    await expectLater(
-      repo.prepareClipFrames(2),
-      throwsA(isA<FluvieRenderException>()),
-    );
-    await preResolveCompositionClips(
-      composition: const SizedBox(),
-      resolver: repo,
-      totalFrames: 1,
-    );
+    await expectLater(repo.prepareClipFrames(2), throwsA(isA<FluvieRenderException>()));
+    await preResolveCompositionClips(composition: const SizedBox(), resolver: repo, totalFrames: 1);
     await repo.prepareClipFrames(2);
     await repo.preResolveClip(_clip, [0, 1, 10, 11]);
     expect(extractor.extracted, [0, 1, 10, 11]);
@@ -259,10 +295,7 @@ void main() {
       ),
     );
 
-    await expectLater(
-      () => repo.preResolveClip(_clip, [0]),
-      throwsA(isA<FluvieRenderException>()),
-    );
+    await expectLater(() => repo.preResolveClip(_clip, [0]), throwsA(isA<FluvieRenderException>()));
   });
 
   test('probeClip returns metadata and probes once (cached)', () async {
@@ -412,6 +445,47 @@ void main() {
 
     expect(frame.debugDisposed, isTrue);
     expect(repo.dispose, returnsNormally, reason: 'a second dispose is a no-op');
+  });
+
+  testWidgets('sandbox warms streaming clip frames before mounting and pumping', (tester) async {
+    final extractor = _FakeExtractor();
+    final repo = _repo(
+      assets: {'clip_1s.mp4': Uint8List(16)},
+      probe: _FakeProbe(_probeResult),
+      extractor: extractor,
+      clipFrameStore: _MemoryClipStore(),
+    );
+    addTearDown(repo.dispose);
+    tester.view
+      ..physicalSize = const Size(16, 16)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final sandbox = MemoryRenderSandbox();
+    final manifest = await tester.runAsync(
+      () => renderToSandbox(
+        composition: Video(
+          width: 16,
+          height: 16,
+          scenes: [
+            Scene(duration: const Time.frames(2), children: [Clip.asset('clip_1s.mp4')]),
+          ],
+        ),
+        aspect: Aspect.square,
+        frameCount: 2,
+        sandbox: sandbox,
+        capture: const RepaintBoundaryCaptureService(),
+        pumpWidget: tester.pumpWidget,
+        pumpFrame: tester.pump,
+        longEdge: 16,
+        resolver: repo,
+      ),
+    );
+
+    expect(extractor.extracted, [0, 1]);
+    final rgba = await sandbox.readBytes(manifest!.framesFileName);
+    expect(rgba, hasLength(2 * 16 * 16 * 4));
   });
 
   tearDownAll(() {

@@ -35,7 +35,8 @@ typedef SandboxFactory = Future<Directory> Function();
 /// the live UI never flickers), writing `frames.rgba` into a sandbox, then
 /// encodes those frames with the platform's hardware video encoder through a
 /// [MobileVideoEncoder]. No FFmpeg, no bundled binary, no network: the frames
-/// never leave the device.
+/// never leave the device. The temporary capture files are removed when the
+/// render finishes, including when capture or encoding fails.
 ///
 /// Every dependency is injected so the orchestration is unit-testable. Audio is
 /// opt-in: pass `audio: true` to [render] to decode, mix, and mux a `Video`'s
@@ -140,7 +141,10 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
         ? _createNativeMediaContainer(networkAllowlist)
         : null;
     final resolver = mediaResolver ?? ownedContainer!.read<MediaResolver>(mediaResolverProvider);
+    Directory? captureDirectory;
     try {
+      await sandbox.create(recursive: true);
+      final captureDir = captureDirectory = await sandbox.createTemp('capture_');
       onProgress?.call(RenderProgress(RenderPhase.capturing, compositionKey: compositionKey));
       final captured = await runStage(
         RenderPhase.capturing,
@@ -152,7 +156,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
           composition: Directionality(textDirection: TextDirection.ltr, child: composition),
           aspect: aspect,
           frameCount: frameCount,
-          outDir: sandbox,
+          outDir: captureDir,
           service: _service,
           pumpWidget: host.mount,
           pumpFrame: host.pumpFrame,
@@ -171,6 +175,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
         fps: fps,
         frameCount: frameCount,
         materializer: _audioMaterializer,
+        resolver: resolver,
         warnSink: _onWarning,
       );
       final outputPath = outputFile?.path ?? '${sandbox.path}/${manifest.outputFileName}';
@@ -181,7 +186,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
           RenderPhase.encoding,
           () => _encoder.encode(
             MobileEncodeRequest(
-              framesPath: '${sandbox.path}/${manifest.framesFileName}',
+              framesPath: '${captureDir.path}/${manifest.framesFileName}',
               outputPath: outputPath,
               width: manifest.width,
               height: manifest.height,
@@ -206,6 +211,7 @@ final class OnDeviceVideoRenderer implements VideoRenderer<File> {
       return File(outputPath);
     } finally {
       await runGuarded([
+        if (captureDirectory != null) () async => captureDirectory!.delete(recursive: true),
         host.dispose,
         () async {
           // Only dispose the resolver this render built; a caller-injected

@@ -91,7 +91,7 @@ final class VideoState extends State<Video> {
         preparation.schedule(() => _resolveSchedules(Duration.zero));
       }
     }
-    final offsets = widget._offsets;
+    final offsets = widget.sceneOffsets;
     return FrameSceneScope(
       captureSize: FrameSceneScope.maybeOf(context)?.captureSize,
       compositionSize: Size(widget.width.toDouble(), widget.height.toDouble()),

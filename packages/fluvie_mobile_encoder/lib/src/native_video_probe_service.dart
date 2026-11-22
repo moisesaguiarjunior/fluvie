@@ -70,6 +70,7 @@ final class NativeVideoProbeService implements VideoProbeService {
       height: height,
       nbFrames: (facts['frameCount'] as int?) ?? 0,
       durationSeconds: durationMs / 1000.0,
+      hasAudio: (facts['hasAudio'] as bool?) ?? false,
     );
   }
 

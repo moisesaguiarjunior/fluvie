@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:fluvie/src/animation/runtime/reactive_scope_builder.dart';
 import 'package:fluvie/src/composition/runtime/frame_scene_scope.dart';
+import 'package:fluvie/src/composition/runtime/reactive_audio_window.dart';
 import 'package:fluvie/src/composition/runtime/reactive_collector.dart';
 import 'package:fluvie/src/core/anchor.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
@@ -120,10 +121,12 @@ CaptureShell buildCaptureShell({
 /// is skipped, so a non-beat reactive track never mounts an empty scope.
 Widget _beatGridScopeFor(ReactiveTracks tracks, MediaResolver resolver, Widget child) {
   final defaultSource = tracks.defaultSource;
-  final defaultGrid = defaultSource == null ? null : _gridOrNull(resolver, defaultSource);
+  final defaultGrid = defaultSource == null
+      ? null
+      : _gridOrNull(resolver, defaultSource, tracks.defaultWindow);
   final trackGrids = <Anchor, BeatGrid>{};
   for (final entry in tracks.byAnchor.entries) {
-    final grid = _gridOrNull(resolver, entry.value);
+    final grid = _gridOrNull(resolver, entry.value, tracks.windows[entry.key]);
     if (grid != null) trackGrids[entry.key] = grid;
   }
   if (defaultGrid == null && trackGrids.isEmpty) return child;
@@ -136,9 +139,10 @@ Widget _beatGridScopeFor(ReactiveTracks tracks, MediaResolver resolver, Widget c
 
 /// The analysed [BeatGrid] for [source], or `null` when the resolver has none
 /// (a reactive track analysed only for its band table carries no grid).
-BeatGrid? _gridOrNull(MediaResolver resolver, AudioSource source) {
+BeatGrid? _gridOrNull(MediaResolver resolver, AudioSource source, ReactiveAudioWindow? window) {
   try {
-    return resolver.beatGridFor(source);
+    final grid = resolver.beatGridFor(source);
+    return window == null ? grid : window.placeBeats(grid, resolver.bandTableFor(source));
   } on Object {
     return null;
   }

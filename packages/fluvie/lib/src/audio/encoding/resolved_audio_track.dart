@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fluvie/src/audio/audio.dart';
 import 'package:fluvie/src/audio/encoding/sfx_trigger_resolver.dart';
 import 'package:fluvie/src/core/time.dart';
@@ -21,6 +23,7 @@ final class ResolvedAudioTrack {
     this.volume = 1,
     this.trimStartSeconds,
     this.trimEndSeconds,
+    this.maxPlaybackSeconds,
     this.fadeInSeconds,
     this.fadeOutSeconds,
     this.fadeOutStartSeconds = 0,
@@ -42,6 +45,9 @@ final class ResolvedAudioTrack {
 
   /// Where playback ends in the source file, in seconds; `null` plays to the end.
   final double? trimEndSeconds;
+
+  /// Maximum playback after the delay, including repeats; null uses the render window.
+  final double? maxPlaybackSeconds;
 
   /// How long the track ramps in from silence, in seconds; `null` for no fade.
   final double? fadeInSeconds;
@@ -74,7 +80,7 @@ final class ResolvedAudioMix {
 }
 
 /// Resolves one [track] to its encoder-neutral [ResolvedAudioTrack], against the
-/// render [fps] and composition [scope].
+/// render [fps] and [scope]. [startFrame] places the track on the render clock.
 ///
 /// This is the single source of the mix's timing math: the FFmpeg
 /// `AudioTrackNode` and the on-device `resolveAudioMix` both build from it, so a
@@ -84,17 +90,23 @@ ResolvedAudioTrack resolveAudioTrack(
   Audio track, {
   required int fps,
   required TimeScopeData scope,
+  int startFrame = 0,
+  int? endFrame,
 }) {
   final resolvedTrim = track.trim?.resolveFrames(scope);
   final trimStartSeconds = resolvedTrim == null ? null : resolvedTrim.start / fps;
   final trimEndSeconds = resolvedTrim == null ? null : resolvedTrim.end / fps;
   final fadeOutSeconds = _seconds(track.fadeOut, scope, fps);
+  final triggerFrame = track.isSfx ? resolveSfxFrame(track.at, scope) : 0;
+  final delayFrames = startFrame + triggerFrame;
+  final delayMs = delayFrames <= 0 ? 0 : (delayFrames / fps * 1000).round();
   return ResolvedAudioTrack(
     source: track.source,
-    delayMs: track.isSfx ? _delayMs(track, scope, fps) : 0,
+    delayMs: delayMs,
     volume: track.volume,
     trimStartSeconds: trimStartSeconds,
     trimEndSeconds: trimEndSeconds,
+    maxPlaybackSeconds: endFrame == null ? null : math.max(0, endFrame / fps - delayMs / 1000),
     fadeInSeconds: _seconds(track.fadeIn, scope, fps),
     fadeOutSeconds: fadeOutSeconds,
     fadeOutStartSeconds: fadeOutSeconds == null
@@ -128,13 +140,6 @@ double _fadeOutStart({
   }
   final start = audioEndSeconds - fadeOutSeconds;
   return start > 0 ? start : 0;
-}
-
-/// The sfx delay in milliseconds: the resolved `at:` frame converted against
-/// [fps] (`frame / fps * 1000`), or `0` when the effect fires at the start.
-int _delayMs(Audio track, TimeScopeData scope, int fps) {
-  final frame = resolveSfxFrame(track.at, scope);
-  return frame <= 0 ? 0 : (frame / fps * 1000).round();
 }
 
 double? _seconds(Time? time, TimeScopeData scope, int fps) {

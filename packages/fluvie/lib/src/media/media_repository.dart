@@ -122,6 +122,7 @@ final class MediaRepository
   final Map<AudioSource, String> _audioPaths = {};
   final Map<AudioSource, BeatGrid> _beatGrids = {};
   final Map<AudioSource, BandTable> _bandTables = {};
+  final Map<AudioSource, ({int fps, int totalFrames})> _reactiveCoverage = {};
   final Map<String, ui.Image> _snapshots = {};
   final Map<CaptionSource, List<CaptionCue>> _captionCues = {};
 

@@ -14,6 +14,8 @@ import 'package:fluvie/src/core/aspect.dart';
 import 'package:fluvie/src/core/audio/audio_source.dart';
 import 'package:fluvie/src/core/media/media_source.dart';
 import 'package:fluvie/src/core/time.dart';
+import 'package:fluvie/src/core/time_range.dart';
+import 'package:fluvie/src/core/transition.dart';
 import 'package:fluvie/src/elements/clip.dart';
 import 'package:fluvie/src/rendering/capture/render_manifest.dart';
 import 'package:fluvie/src/rendering/capture/repaint_boundary_capture_service.dart';
@@ -27,14 +29,17 @@ const _clipAudio = AudioSource.asset('clip.mp4');
 
 Future<ui.Image> _frame() async {
   final recorder = ui.PictureRecorder();
-  ui.Canvas(recorder).drawRect(
-    const ui.Rect.fromLTWH(0, 0, 4, 4),
-    ui.Paint()..color = const ui.Color(0xFFFFFFFF),
-  );
+  ui.Canvas(
+    recorder,
+  ).drawRect(const ui.Rect.fromLTWH(0, 0, 4, 4), ui.Paint()..color = const ui.Color(0xFFFFFFFF));
   return recorder.endRecording().toImage(4, 4);
 }
 
-Future<RenderManifest> _renderClip(WidgetTester tester, {required bool hasAudio}) async {
+Future<RenderManifest> _renderClip(
+  WidgetTester tester, {
+  required bool hasAudio,
+  bool overlappingTrim = false,
+}) async {
   final image = await _frame();
   addTearDown(image.dispose);
   final audioFile = File(
@@ -44,9 +49,17 @@ Future<RenderManifest> _renderClip(WidgetTester tester, {required bool hasAudio}
 
   final resolver = FakeMediaResolver(
     {_clip: (bytes: Uint8List(0), contentHash: 'x')},
-    metadata: {_clip: (fps: 30, frameCount: 30, width: 16, height: 16, hasAudio: hasAudio)},
+    metadata: {
+      _clip: (
+        fps: overlappingTrim ? 24 : 30,
+        frameCount: 96,
+        width: 16,
+        height: 16,
+        hasAudio: hasAudio,
+      ),
+    },
     clipFrames: {
-      _clip: {0: image, 1: image},
+      _clip: {0: image, 1: image, if (overlappingTrim) 48: image},
     },
     audioPaths: {_clipAudio: audioFile.path},
   );
@@ -65,13 +78,23 @@ Future<RenderManifest> _renderClip(WidgetTester tester, {required bool hasAudio}
       composition: Video(
         width: 16,
         height: 16,
+        transition: overlappingTrim ? const Transition.crossFade(Time.frames(12)) : null,
         scenes: [
-          Scene(duration: const Time.frames(2), children: [Clip.asset('clip.mp4')]),
+          if (overlappingTrim) const Scene(duration: Time.frames(30)),
+          Scene(
+            duration: Time.frames(overlappingTrim ? 30 : 2),
+            children: [
+              Clip.asset(
+                'clip.mp4',
+                trim: overlappingTrim ? const TimeRange(Time.frames(48), Time.frames(72)) : null,
+              ),
+            ],
+          ),
         ],
       ),
       aspect: Aspect.square,
       longEdge: 16,
-      frameCount: 2,
+      frameCount: overlappingTrim ? 19 : 2,
       outDir: dir,
       service: RenderService(capture: const RepaintBoundaryCaptureService(), media: resolver),
       pumpWidget: tester.pumpWidget,
@@ -90,6 +113,15 @@ void main() {
     expect(manifest.ffmpegArgs, isNot(contains('-an')));
     // The clip's own video file is the audio input.
     expect(manifest.ffmpegArgs.any((a) => a.startsWith('clip_audio_0_')), isTrue);
+  });
+
+  testWidgets('an overlapping clip uses its source trim and the image start in FFmpeg', (
+    tester,
+  ) async {
+    final manifest = await _renderClip(tester, hasAudio: true, overlappingTrim: true);
+    final graph = manifest.ffmpegArgs[manifest.ffmpegArgs.indexOf('-filter_complex') + 1];
+    expect(graph, contains('atrim=start=2:end=3'));
+    expect(graph, contains('adelay=600:all=1'));
   });
 
   testWidgets('a silent clip stays on the -an plan (no broken audio map)', (tester) async {
